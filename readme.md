@@ -126,9 +126,8 @@ python run.py
 ---
 
 ## 界面预览
-
-![任务中心](579a122eb8e23b3618dbc47bf185da64.png)
-![历史记录](b1301400cfe27a7bc7547768435988f0.png)
+![任务中心](example_pics/579a122eb8e23b3618dbc47bf185da64.png)
+![历史记录](example_pics/b1301400cfe27a7bc7547768435988f0.png)
 ---
 
 ## License
