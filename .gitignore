@@ -8,6 +8,4 @@ __pycache__/
 *.egg-info/
 dist/
 build/
-tools/
 test_video/
-faster-whisper-large-v3-turbo/
