@@ -2,15 +2,15 @@
   "video_path": "",
   "features": {
     "enable_asr_prompt": true,
-    "enable_ad_detection": true,
-    "enable_summary": true,
-    "enable_titles": true,
+    "enable_ad_detection": false,
+    "enable_summary": false,
+    "enable_titles": false,
     "enable_tags": false
   },
   "translate_backend": "online_api",
   "local_translation": {
-    "model_dir": "E:/modelscope/tencent-hunyuan/HY-MT1___5-1___8B",
-    "topic": "Footballer tactical and technical analysis"
+    "model_dir": "D:/models/HY-MT1.5-1.8B",
+    "topic": "your topic in English, e.g. football tactical analysis"
   },
   "online_api": {
     "base_url": "https://api.siliconflow.cn/v1/chat/completions",
@@ -60,17 +60,17 @@
     }
   },
   "whisper": {
-    "model_dir": "E:/video-subtitle-flow-web-backend/faster-whisper-large-v3-turbo",
+    "model_dir": "D:/models/faster-whisper-large-v3-turbo",
     "device": "cpu",
     "compute_type": "int8",
     "beam_size": 5,
     "language": "en"
   },
   "ffmpeg": {
-    "executable": "E:/199_Review/ffmpeg/ffmpeg-8.0.1-essentials_build/bin/ffmpeg.exe",
-    "ffprobe": "E:/199_Review/ffmpeg/ffmpeg-8.0.1-essentials_build/bin/ffprobe.exe"
+    "executable": "D:/tools/ffmpeg/bin/ffmpeg.exe",
+    "ffprobe": "D:/tools/ffmpeg/bin/ffprobe.exe"
   },
-  "logo_path": "E:/199_Review/logo/199_logo.png",
+  "logo_path": "D:/logo/logo.png",
   "font": {
     "zh": "Microsoft YaHei",
     "en": "Arial",
