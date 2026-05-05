@@ -1,0 +1,13 @@
+uploads/
+output/
+logs/
+tasks.db
+__pycache__/
+*.pyc
+.env
+*.egg-info/
+dist/
+build/
+tools/
+test_video/
+faster-whisper-large-v3-turbo/

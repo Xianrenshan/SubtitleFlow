@@ -1,0 +1,9 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+python-multipart==0.0.12
+sqlalchemy==2.0.35
+aiosqlite==0.20.0
+pydantic==2.8.0
+faster-whisper==1.1.0  
+requests==2.31.0
+pysubs2==1.6.1

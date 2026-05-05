@@ -1,0 +1,88 @@
+{
+  "video_path": "",
+  "features": {
+    "enable_asr_prompt": true,
+    "enable_ad_detection": true,
+    "enable_summary": true,
+    "enable_titles": true,
+    "enable_tags": false
+  },
+  "translate_backend": "online_api",
+  "local_translation": {
+    "model_dir": "E:/modelscope/tencent-hunyuan/HY-MT1___5-1___8B",
+    "topic": "Footballer tactical and technical analysis"
+  },
+  "online_api": {
+    "base_url": "https://api.siliconflow.cn/v1/chat/completions",
+    "api_key": "",
+    "model": "deepseek-ai/DeepSeek-V3",
+    "temperature": 0.3,
+    "max_tokens": 1024,
+    "system_prompt": "你是一个专业的字幕翻译助手。请将用户提供的英文逐句翻译成中文，只输出译文，不要解释，不要添加额外内容。",
+    "batch_mode": true,
+    "batch_size": 5,
+    "request_delay": 0.2,
+    "enable_thinking": false
+  },
+  "subtitle": {
+    "max_chars": 80,
+    "min_duration": 1.0
+  },
+  "ollama_service": {
+    "base_url": "http://localhost:11434",
+    "executable": "ollama"
+  },
+  "ollama": {
+    "translate": {
+      "model": "demonbyron/HY-MT1.5-1.8B:Q4_K_M",
+      "base_url": "http://localhost:11434",
+      "num_ctx": 6144,
+      "temperature": 0.7,
+      "top_p": 0.6,
+      "max_tokens": 1200,
+      "concurrency": 1
+    },
+    "analysis": {
+      "model": "qwen3:8b",
+      "base_url": "http://localhost:11434",
+      "num_ctx": 4096,
+      "temperature": 0.3,
+      "max_tokens": 1024,
+      "concurrency": 1
+    },
+    "prompt_generation": {
+      "model": "qwen2.5:1.5b",
+      "base_url": "http://localhost:11434",
+      "num_ctx": 1024,
+      "temperature": 0.3,
+      "max_tokens": 60,
+      "concurrency": 1
+    }
+  },
+  "whisper": {
+    "model_dir": "E:/video-subtitle-flow-web-backend/faster-whisper-large-v3-turbo",
+    "device": "cpu",
+    "compute_type": "int8",
+    "beam_size": 5,
+    "language": "en"
+  },
+  "ffmpeg": {
+    "executable": "E:/199_Review/ffmpeg/ffmpeg-8.0.1-essentials_build/bin/ffmpeg.exe",
+    "ffprobe": "E:/199_Review/ffmpeg/ffmpeg-8.0.1-essentials_build/bin/ffprobe.exe"
+  },
+  "logo_path": "E:/199_Review/logo/199_logo.png",
+  "font": {
+    "zh": "Microsoft YaHei",
+    "en": "Arial",
+    "scale": 1.2,
+    "zh_color": "#FFE62B",
+    "en_color": "#D0D0D0",
+    "zh_outline": 3.5,
+    "en_outline": 2.5,
+    "shadow": 2.0,
+    "min_font_size_zh": 28,
+    "min_font_size_en": 20,
+    "max_font_size_zh_ratio": 0.08,
+    "max_font_size_en_ratio": 0.055
+  }
+}
