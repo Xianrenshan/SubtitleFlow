@@ -64,7 +64,6 @@ def call_api_with_prompt(config: dict, prompt: str, system_prompt: Optional[str]
     data = resp.json()
     return data["choices"][0]["message"]["content"].strip()
 
-
 def translate_batch(texts: List[str], config: dict, system_prompt: str = "",
                     context_prev: str = "", max_retries: int = 3) -> List[str]:
     """
@@ -111,6 +110,7 @@ def translate_batch(texts: List[str], config: dict, system_prompt: str = "",
         "stream": False
     }
     
+    # 👇 根据配置决定是否关闭思考模式（与 call_api_with_prompt 保持一致）
     if api_cfg.get("enable_thinking") is False:
         payload["enable_thinking"] = False
     
