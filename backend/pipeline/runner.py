@@ -10,7 +10,7 @@ from backend.pipeline.heartbeat import heartbeat_updater
 async def run_pipeline(video_path: Path, config: dict, progress_callback: Callable[[str, int, float, float], Awaitable[None]]) -> Dict[str, str]:
     task_id = video_path.stem
 
-    # ===== 新增：生成 safe_base_name 并注入 config =====
+    # ===== 生成 safe_base_name：仅基于原始文件名，不再追加 task_id =====
     # 获取原始文件名（若未提供则用当前文件名）
     original_filename = config.get("original_filename", video_path.name)
     # 提取文件名主体（去掉路径和扩展名）
@@ -21,12 +21,8 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     max_len = 50
     if len(safe_stem) > max_len:
         safe_stem = safe_stem[:max_len]
-    # 追加 task_id 短前缀保证唯一性
-    safe_base_name = f"{safe_stem}_{task_id[:8]}"
-
-    # 浅拷贝 config，避免副作用，并注入 safe_base_name
-    config = dict(config)
-    config["safe_base_name"] = safe_base_name
+    # 输出目录已经是 task_id 隔离，文件名无需再加 task_id 保证唯一性
+    safe_base_name = safe_stem
     # =================================================
 
     output_dir = PROJECT_ROOT / "output" / task_id
@@ -63,7 +59,9 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     if features.get("enable_asr_prompt", True):
         await set_step_started("生成ASR提示词")
         await progress_callback("生成ASR提示词", 0, 0, None, force=True)
-        video_prompt = step1_generate_prompt.generate_prompt(video_path, config)
+        video_prompt = await asyncio.to_thread(
+            step1_generate_prompt.generate_prompt, video_path, config
+        )
         await progress_callback("生成ASR提示词", 100, 0, None, force=True)
 
     # 根据 Step 1 构造 Whisper 的 initial_prompt
@@ -93,34 +91,37 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
         await safe_cancel(heartbeat_task2)
     await progress_callback("语音识别", 100, 0, None, force=True)
 
-    # ========== Step 2.5: 内容分析（进度合并到"分析与翻译"的前10%） ==========
+    # ========== Step 2.5: 内容分析（进度合并到"分析与翻译"的前5%） ==========
     content_prompt = {}
     online_cfg = config.get("online_api", {})
     use_content_analysis = bool(online_cfg.get("base_url") and online_cfg.get("api_key"))
 
     if use_content_analysis:
-        print("[runner] 开始内容分析（进度将合并到分析与翻译的前10%）...")
+        print("[runner] 开始内容分析（进度将合并到分析与翻译的前5%）...")
         try:
             entries = step3_analyze_and_translate.parse_subtitle_entries(en_txt_path)
+            
+            step25_start_time = time.time()
             def content_analysis_progress_wrapper(raw_progress: int, eta_sec: float = None):
-                mapped_progress = int(raw_progress * 0.1)
+                mapped_progress = int(raw_progress * 0.05)  # 0-100% → 0-5%
+                elapsed = time.time() - step25_start_time
                 asyncio.run_coroutine_threadsafe(
-                    progress_callback("分析与翻译", mapped_progress, 0, eta_sec, force=True),
+                    progress_callback("分析与翻译", mapped_progress, elapsed, eta_sec, force=True),
                     loop
                 )
 
             content_prompt = await asyncio.to_thread(
                 step3_analyze_and_translate.analyze_content_for_prompt,
-                entries, config
+                entries, config, content_analysis_progress_wrapper
             )
-            await progress_callback("分析与翻译", 10, 0, None, force=True)
+            await progress_callback("分析与翻译", 5, 0, None, force=True)
         except Exception as e:
             print(f"[runner] 内容分析失败，将使用文件名提示词作为回退: {e}")
             content_prompt = {}
-            await progress_callback("分析与翻译", 10, 0, None, force=True)
+            await progress_callback("分析与翻译", 5, 0, None, force=True)
     else:
         print("[runner] 在线 API 未完整配置，跳过内容分析")
-        await progress_callback("分析与翻译", 10, 0, None, force=True)
+        await progress_callback("分析与翻译", 5, 0, None, force=True)
 
     # 合并提示词（内容分析为主，文件名预测补充）
     merged_video_prompt = video_prompt.copy()
@@ -147,19 +148,11 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
 
     # ========== Step 3: 分析与翻译 ==========
     await set_step_started("分析与翻译")
-    translate_progress = {"percent": 10}
-
-    def translate_progress_wrapper(raw_progress: int, eta_sec: float = None):
-        mapped_progress = 10 + int(raw_progress * 0.9)
-        if mapped_progress > 100:
-            mapped_progress = 100
-        translate_progress["percent"] = mapped_progress
-        asyncio.run_coroutine_threadsafe(
-            progress_callback("分析与翻译", mapped_progress, 0, eta_sec, force=True),
-            loop
-        )
+    await progress_callback("分析与翻译", 5, 0, None, force=True)
 
     updater3 = make_sync_updater("分析与翻译")
+    translate_progress = {"percent": 5}  # 与分析阶段起点对齐
+
     heartbeat_task3 = asyncio.create_task(
         heartbeat_updater("分析与翻译", progress_callback, lambda: translate_progress["percent"])
     )
