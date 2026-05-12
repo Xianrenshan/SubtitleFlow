@@ -308,7 +308,6 @@ def burn_video_with_progress(video_in, ass_in, logo_in, video_out, total_duratio
         print("❌ 压制失败")
         return False
 
-
 def burn_subtitles(video_path, en_srt_path, zh_srt_path, output_dir=None,
                    meta_path=None, config=None, progress_callback=None):
     if output_dir is None:
@@ -326,7 +325,10 @@ def burn_subtitles(video_path, en_srt_path, zh_srt_path, output_dir=None,
     ass_path = output_dir / "temp_bilingual.ass"
     create_adaptive_ass(str(zh_srt_path), str(en_srt_path), height, str(ass_path), config)
 
-    out_video = output_dir / f"{video_path.stem}_subtitled.mp4"
+    # 使用 safe_base_name 生成最终视频文件名
+    safe_base_name = config.get("safe_base_name", video_path.stem)
+    out_video = output_dir / f"{safe_base_name}_subtitled.mp4"
+
     success = burn_video_with_progress(str(video_path), str(ass_path), logo_path, str(out_video),
                                        duration, ffmpeg_path, False, 30, progress_callback)
 

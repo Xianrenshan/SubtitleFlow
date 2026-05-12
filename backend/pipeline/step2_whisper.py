@@ -82,12 +82,14 @@ def write_txt(entries: list, txt_path: Path):
         for e in entries:
             f.write(f"{e['index']}\n{e['start']} --> {e['end']}\n{e['text']}\n\n")
 
-
 def run_whisper(video_path: Path, config: dict, prompt_text: str = "", output_dir: Path = None,
                 progress_callback=None, progress_dict=None):
     if output_dir is None:
         output_dir = video_path.parent / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # 使用 safe_base_name 作为输出文件的主名，若未提供则回退到 video_path.stem
+    safe_base_name = config.get("safe_base_name", video_path.stem)
 
     whisper_cfg = config["whisper"]
     model = WhisperModel(
@@ -97,22 +99,20 @@ def run_whisper(video_path: Path, config: dict, prompt_text: str = "", output_di
         local_files_only=True
     )
     
-    # 调整参数，尽量输出短句
     segments, info = model.transcribe(
         str(video_path),
         beam_size=whisper_cfg.get("beam_size", 5),
         initial_prompt=prompt_text,
         language=whisper_cfg.get("language", "en"),
-        vad_filter=True,  # 启用语音活动检测，自动过滤静默
-        vad_parameters=dict(min_silence_duration_ms=500),  # 500ms 静默即断句
-        condition_on_previous_text=False,  # 减少对前文的依赖，避免长句
+        vad_filter=True,
+        vad_parameters=dict(min_silence_duration_ms=500),
+        condition_on_previous_text=False,
     )
     
     total_duration = info.duration
-    srt_path = output_dir / f"{video_path.stem}.srt"
-    txt_path = output_dir / f"{video_path.stem}.txt"
+    srt_path = output_dir / f"{safe_base_name}.srt"
+    txt_path = output_dir / f"{safe_base_name}.txt"
 
-    # 先生成原始条目
     raw_entries = []
     with open(srt_path, "w", encoding="utf-8") as f_srt, open(txt_path, "w", encoding="utf-8") as f_txt:
         for i, segment in enumerate(segments, start=1):
@@ -139,7 +139,6 @@ def run_whisper(video_path: Path, config: dict, prompt_text: str = "", output_di
                 'text': text
             })
 
-    # 视觉换行处理（不拆时间轴）
     print(f"📏 原始字幕共 {len(raw_entries)} 句，检查是否需要视觉换行...")
     
     subtitle_cfg = config.get("subtitle", {})
@@ -150,7 +149,6 @@ def run_whisper(video_path: Path, config: dict, prompt_text: str = "", output_di
         parts = split_long_entry_visual(e, max_chars)
         processed_entries.extend(parts)
     
-    # 重新编号（因为可能有新增条目）
     for i, e in enumerate(processed_entries, 1):
         e['index'] = i
     

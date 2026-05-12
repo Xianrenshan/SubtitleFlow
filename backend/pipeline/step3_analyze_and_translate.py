@@ -319,7 +319,6 @@ def batch_translate(entries, video_prompt: dict, config, progress_callback=None,
     else:
         return batch_translate_online(entries, config, progress_callback, progress_dict)
 
-
 def run_analysis_and_translate(en_txt_path: Path, config: dict, output_dir: Path = None,
                                progress_callback=None, progress_dict=None,
                                video_prompt: dict = None):
@@ -327,11 +326,13 @@ def run_analysis_and_translate(en_txt_path: Path, config: dict, output_dir: Path
         output_dir = en_txt_path.parent
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # 显式使用 safe_base_name，保持与 step2 输出一致
+    safe_base_name = config.get("safe_base_name", en_txt_path.stem)
+
     print("📖 读取英文字幕...")
     entries = parse_subtitle_entries(en_txt_path)
     print(f"   共 {len(entries)} 句字幕")
 
-    # 分层分析（摘要、标题等）
     meta = hierarchical_analyze(entries, config, progress_callback, progress_dict)
 
     if video_prompt is None:
@@ -342,14 +343,11 @@ def run_analysis_and_translate(en_txt_path: Path, config: dict, output_dir: Path
     zh_entries = batch_translate(entries, video_prompt, config, progress_callback, progress_dict)
     print(f"   翻译耗时 {time.time() - start_trans:.0f} 秒")
 
-    # ⚠️ 关键修改：不再对中文进行 split_chinese_line 分割
-    # 将换行决策完全交由 step4 的2行优先排版引擎处理
     print("📝 保留单行原文，不进行 Step3 预分割")
 
-    stem = en_txt_path.stem
-    zh_srt_path = output_dir / f"{stem}_zh.srt"
-    zh_txt_path = output_dir / f"{stem}_zh.txt"
-    meta_path = output_dir / f"{stem}_meta.json"
+    zh_srt_path = output_dir / f"{safe_base_name}_zh.srt"
+    zh_txt_path = output_dir / f"{safe_base_name}_zh.txt"
+    meta_path = output_dir / f"{safe_base_name}_meta.json"
 
     with open(zh_srt_path, "w", encoding="utf-8") as f:
         for e in zh_entries:
