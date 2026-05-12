@@ -142,6 +142,10 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
         mapped_progress = 10 + int(raw_progress * 0.9)
         if mapped_progress > 100:
             mapped_progress = 100
+
+        # 👇 修复：同步更新共享进度变量，防止心跳用旧值覆盖正确进度
+        translate_progress["percent"] = mapped_progress
+
         asyncio.run_coroutine_threadsafe(
             progress_callback("分析与翻译", mapped_progress, 0, eta_sec, force=True),
             loop
