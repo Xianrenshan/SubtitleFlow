@@ -63,6 +63,17 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
             step1_generate_prompt.generate_prompt, video_path, config
         )
         await progress_callback("生成ASR提示词", 100, 0, None, force=True)
+        
+        # 🔧 新增日志：确认 Step1 产物
+        print(f"[runner] Step1 生成术语: {len(video_prompt.get('terms', []))} 个")
+        print(f"[runner] Step1 生成领域: {video_prompt.get('domain', 'general')}")
+        print(f"[runner] Step1 生成风格: {video_prompt.get('style', '无')[:60]}")
+        if video_prompt.get('terms'):
+            print(f"[runner] Step1 术语预览:")
+            for t in video_prompt['terms'][:5]:
+                print(f"[runner]   - {t.get('en','')} → {t.get('zh','')}")
+    else:
+        print("[runner] Step1 已关闭（enable_asr_prompt=false），跳过文件名提示词生成")
 
     # 根据 Step 1 构造 Whisper 的 initial_prompt
     initial_prompt = ""
@@ -114,6 +125,14 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
                 step3_analyze_and_translate.analyze_content_for_prompt,
                 entries, config, content_analysis_progress_wrapper
             )
+            
+            # 🔧 新增日志：确认 Step2.5 产物
+            print(f"[runner] Step2.5 内容分析领域: {content_prompt.get('domain', 'general')}")
+            print(f"[runner] Step2.5 内容分析术语: {len(content_prompt.get('terms', []))} 个")
+            if content_prompt.get('terms'):
+                for t in content_prompt['terms'][:5]:
+                    print(f"[runner]   - {t.get('en','')} → {t.get('zh','')}")
+            
             await progress_callback("分析与翻译", 5, 0, None, force=True)
         except Exception as e:
             print(f"[runner] 内容分析失败，将使用文件名提示词作为回退: {e}")
@@ -142,6 +161,12 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
             if vh.lower() not in seen_hints:
                 content_hints.append(vh)
         merged_video_prompt["asr_hints"] = content_hints
+
+    # 🔧 新增日志：打印合并后的最终提示词摘要
+    print(f"[runner] 合并后术语总数: {len(merged_video_prompt.get('terms', []))}")
+    print(f"[runner] 合并后领域: {merged_video_prompt.get('domain', 'general')}")
+    print(f"[runner] 合并后风格: {merged_video_prompt.get('style', '默认')[:60]}")
+    print(f"[runner] 合并后 ASR hints: {len(merged_video_prompt.get('asr_hints', []))}")
 
     # 注意：这里不再需要 config = dict(config)，因为函数开头已经拷贝过
     config["translate_backend"] = "online_api"

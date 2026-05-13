@@ -49,17 +49,28 @@ def generate_prompt(video_path: Path, config: dict) -> dict:
 3. 如果无法判断具体领域，domain 填 "general"，terms 留空列表
 """
 
+    print(f"[step1] 视频主题: {topic}")
+    print(f"[step1] 发送 Prompt（前300字）:\n{prompt[:300]}...")
+    
     try:
         response = call_api_with_prompt(config, prompt, max_tokens=1024, temperature=0.3)
+        print(f"[step1] API 原始返回（前500字）:\n{response[:500]}")
         import json
-        # 提取 JSON
-        match = re.search(r'\{.*\}', response, re.DOTALL)
+        
+        # 优先提取 markdown 代码块，再尝试裸 JSON
+        match = re.search(r'```(?:json)?\s*(\{{.*?\}})\s*```', response, re.DOTALL)
+        if not match:
+            match = re.search(r'\{{.*\}}', response, re.DOTALL)
+        
         if match:
-            result = json.loads(match.group())
+            json_str = match.group(1) if match.lastindex else match.group(0)
+            result = json.loads(json_str)
+            print(f"[step1] ✅ JSON 提取成功")
         else:
             result = {}
+            print("[step1] ⚠️ 未能在响应中提取 JSON，将使用默认值")
     except Exception as e:
-        print(f"[step1] 生成提示词失败: {e}，使用默认值")
+        print(f"[step1] ❌ 生成提示词失败: {e}，使用默认值")
         result = {}
     
     # 确保字段存在
@@ -70,5 +81,8 @@ def generate_prompt(video_path: Path, config: dict) -> dict:
     
     print(f"[step1] 识别领域: {result['domain']}")
     print(f"[step1] 术语数量: {len(result['terms'])}")
+    if result['terms']:
+        for t in result['terms'][:5]:
+            print(f"[step1]   - {t.get('en','')} → {t.get('zh','')}")
     
     return result

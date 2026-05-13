@@ -72,12 +72,15 @@ def split_chinese_line(text: str, max_chars: int = 40) -> str:
     return "\n".join(lines)
 
 
-def analyze_content_for_prompt(entries, config):
+def analyze_content_for_prompt(entries, config, progress_callback=None):
     """
     基于 ASR 文本采样，调用在线 API 生成上下文提示词。
     """
     if not entries:
         return {}
+
+    if progress_callback:
+        progress_callback(0, None)
 
     total = len(entries)
     indices = set()
@@ -88,12 +91,15 @@ def analyze_content_for_prompt(entries, config):
     for i in range(30, total - 20, 10):
         if i not in indices:
             indices.add(i)
-    if len(indices) > 150:
+    if len(indices) > 50:
         import random
         indices = set(random.sample(sorted(indices), 150))
 
     sampled = [entries[i] for i in sorted(indices)]
     sampled_text = "\n".join([f"[{e['index']}] {e['text']}" for e in sampled])
+
+    if progress_callback:
+        progress_callback(50, None)  # 采样完成，即将请求 API
 
     prompt = f"""你是一个视频内容分析助手。请根据以下字幕片段，推测视频领域、话语风格、重要术语及可能的语音识别错误。
 
@@ -109,23 +115,35 @@ def analyze_content_for_prompt(entries, config):
 {sampled_text}
 只输出 JSON，不要解释。"""
 
+    print(f"[content_analysis] 发送采样分析请求，共 {len(sampled)} 条字幕...")
+    
     try:
         response = call_api_with_prompt(config, prompt, max_tokens=1024, temperature=0.3)
+        print(f"[content_analysis] API 返回（前400字）: {response[:400]}")
         result = extract_json(response)
         if not result:
+            print("[content_analysis] ⚠️ 未能提取 JSON，使用空结果")
             result = {}
         result.setdefault("domain", "general")
         result.setdefault("style", "")
         result.setdefault("terms", [])
         result.setdefault("asr_hints", [])
         print(f"[content_analysis] 领域: {result.get('domain')}, 术语数: {len(result.get('terms', []))}")
+        if result.get('terms'):
+            for t in result['terms'][:3]:
+                print(f"[content_analysis]   - {t.get('en','')} → {t.get('zh','')}")
+        
+        if progress_callback:
+            progress_callback(100, None)
         return result
     except Exception as e:
-        print(f"[content_analysis] 失败: {e}")
+        print(f"[content_analysis] ❌ 失败: {e}")
+        if progress_callback:
+            progress_callback(100, None)
         return {}
 
 
-def build_system_prompt(video_prompt: dict, content_prompt: dict = None, base_template: str = "") -> str:
+def build_system_prompt(video_prompt: dict, content_prompt: dict = None, base_template: str = "", summary: str = "") -> str:
     """合并翻译系统提示词（内容分析为主）"""
     if content_prompt is None:
         content_prompt = {}
@@ -144,7 +162,9 @@ def build_system_prompt(video_prompt: dict, content_prompt: dict = None, base_te
     for hint in video_prompt.get("asr_hints", []):
         if hint not in asr_hints:
             asr_hints.append(hint)
-    summary_context = content_prompt.get("summary_context", "")
+    
+    # 🔧 关键修复：从外部 summary 参数或 video_prompt 的 summary_context 读取视频摘要
+    summary_context = summary or content_prompt.get("summary_context", "") or video_prompt.get("summary_context", "")
 
     if not base_template:
         base_template = (
@@ -174,7 +194,7 @@ def build_system_prompt(video_prompt: dict, content_prompt: dict = None, base_te
 
     dynamic_parts = []
     if summary_context:
-        dynamic_parts.append(f"Video Content Summary: {summary_context}")
+        dynamic_parts.append(f"Video Content Summary (MUST keep terminology and style consistent with this context):\n{summary_context}")
     if style:
         dynamic_parts.append(f"Translation Style: {style}")
     if terms:
@@ -253,6 +273,10 @@ def hierarchical_analyze(entries, config, progress_callback=None, progress_dict=
                     chunk_summaries.append(resp[:300])
             else:
                 chunk_summaries.append(resp[:300])
+            
+            # 🔧 新增日志：打印当前块摘要
+            last_summary = chunk_summaries[-1][:100] if chunk_summaries else "无"
+            print(f"   ✅ 块 {idx} 完成，摘要（前100字）: {last_summary}...")
         except Exception as e:
             print(f"   ⚠️ 分析块 {idx} 失败: {e}")
             chunk_summaries.append("")
@@ -295,6 +319,12 @@ def hierarchical_analyze(entries, config, progress_callback=None, progress_dict=
     if not ENABLE_TAGS:
         meta.pop("tags", None)
 
+    # 🔧 新增日志：打印最终摘要
+    if meta.get("summary"):
+        print(f"📋 分层分析最终摘要（前200字）: {meta['summary'][:200]}")
+    else:
+        print("📋 分层分析未生成摘要（enable_summary 可能已关闭）")
+
     return meta
 
 
@@ -311,13 +341,29 @@ def batch_translate(entries, video_prompt: dict, config, progress_callback=None,
         backend = "online_api"
 
     if backend == "online_api":
-        system_prompt = build_system_prompt(video_prompt)
+        # 🔧 从 video_prompt 读取可能注入的视频摘要
+        summary = video_prompt.get("summary_context", "")
+        system_prompt = build_system_prompt(video_prompt, summary=summary)
+        
+        # 🔧 新增日志：打印最终进入翻译的提示词摘要
+        print(f"[batch_translate] 使用在线 API，System Prompt 长度: {len(system_prompt)} 字符")
+        print(f"[batch_translate] 包含术语数: {len(video_prompt.get('terms', []))}")
+        print(f"[batch_translate] 包含 ASR hints: {len(video_prompt.get('asr_hints', []))}")
+        print(f"[batch_translate] 领域: {video_prompt.get('domain', 'general')}")
+        if summary:
+            print(f"[batch_translate] 包含视频摘要: 是 ({len(summary)} 字符)")
+            print(f"[batch_translate] 摘要预览: {summary[:120]}...")
+        else:
+            print(f"[batch_translate] ⚠️ 不包含视频摘要（如需摘要提升翻译质量，请在功能开关中开启「内容摘要」）")
+        print(f"[batch_translate] System Prompt 预览（前500字）:\n{system_prompt[:500]}...")
+        
         config["translation_system_prompt"] = system_prompt
         return batch_translate_online(entries, config, progress_callback, progress_dict)
     elif backend == "local_transformers":
         return batch_translate_local(entries, config, progress_callback, progress_dict)
     else:
         return batch_translate_online(entries, config, progress_callback, progress_dict)
+
 
 def run_analysis_and_translate(en_txt_path: Path, config: dict, output_dir: Path = None,
                                progress_callback=None, progress_dict=None,
@@ -333,14 +379,63 @@ def run_analysis_and_translate(en_txt_path: Path, config: dict, output_dir: Path
     entries = parse_subtitle_entries(en_txt_path)
     print(f"   共 {len(entries)} 句字幕")
 
-    meta = hierarchical_analyze(entries, config, progress_callback, progress_dict)
+    # ========== 分层分析：占 5-10% ==========
+    def analyze_wrapper(raw_progress: int, eta_sec: float = None):
+        mapped = 5 + int(raw_progress * 0.05)
+        if mapped > 10:
+            mapped = 10
+        if progress_callback:
+            progress_callback(mapped, eta_sec)
+        if progress_dict is not None:
+            progress_dict["percent"] = mapped
+
+    meta = hierarchical_analyze(entries, config, analyze_wrapper, None)
+
+    # 保险：如果分层分析没走到 100%（例如功能关闭直接返回），强制推到 10%
+    if progress_callback:
+        progress_callback(10, None)
+    if progress_dict is not None:
+        progress_dict["percent"] = 10
 
     if video_prompt is None:
         video_prompt = {}
 
+    # 🔧 关键修复：将分层分析生成的摘要注入翻译上下文，让翻译模型了解视频整体内容
+    video_summary = meta.get("summary", "")
+    if video_summary:
+        print(f"[run_analysis_and_translate] 📋 将分层分析摘要注入翻译提示词（{len(video_summary)} 字符）")
+        video_prompt["summary_context"] = video_summary
+    else:
+        print("[run_analysis_and_translate] ⚠️ 分层分析未返回摘要，翻译将缺少视频整体上下文")
+        # 如果 hierarchical_analyze 被跳过了（所有功能关闭），这里不会进入，但提示一下
+        if not any(config.get("features", {}).get(k) for k in ["enable_summary", "enable_ad_detection", "enable_titles", "enable_tags"]):
+            print("[run_analysis_and_translate] 💡 提示：如需生成摘要辅助翻译，请在配置中开启「内容摘要」或「广告检测」等分析功能")
+
+    # 🔧 打印最终进入翻译的合并提示词摘要
+    preview_system = build_system_prompt(video_prompt, summary=video_summary)
+    print(f"[run_analysis_and_translate] 📝 最终翻译 System Prompt 长度: {len(preview_system)} 字符")
+    print(f"[run_analysis_and_translate] 📝 合并后术语总数: {len(video_prompt.get('terms', []))}")
+    print(f"[run_analysis_and_translate] 📝 合并后领域: {video_prompt.get('domain', 'general')}")
+    print(f"[run_analysis_and_translate] 📝 合并后风格: {video_prompt.get('style', '默认')[:50]}")
+    if video_prompt.get('terms'):
+        print(f"[run_analysis_and_translate] 📝 术语预览:")
+        for t in video_prompt['terms'][:5]:
+            print(f"[run_analysis_and_translate]    - {t.get('en','')} → {t.get('zh','')}")
+
     print("\n🌍 开始批量翻译（在线 API）...")
     start_trans = time.time()
-    zh_entries = batch_translate(entries, video_prompt, config, progress_callback, progress_dict)
+
+    # ========== 批量翻译：占 10-100% ==========
+    def translate_wrapper(raw_progress: int, eta_sec: float = None):
+        mapped = 10 + int(raw_progress * 0.9)
+        if mapped > 100:
+            mapped = 100
+        if progress_callback:
+            progress_callback(mapped, eta_sec)
+        if progress_dict is not None:
+            progress_dict["percent"] = mapped
+
+    zh_entries = batch_translate(entries, video_prompt, config, translate_wrapper, None)
     print(f"   翻译耗时 {time.time() - start_trans:.0f} 秒")
 
     print("📝 保留单行原文，不进行 Step3 预分割")

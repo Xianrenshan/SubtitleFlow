@@ -64,6 +64,7 @@ def call_api_with_prompt(config: dict, prompt: str, system_prompt: Optional[str]
     data = resp.json()
     return data["choices"][0]["message"]["content"].strip()
 
+
 def translate_batch(texts: List[str], config: dict, system_prompt: str = "",
                     context_prev: str = "", max_retries: int = 3) -> List[str]:
     """
@@ -113,7 +114,11 @@ def translate_batch(texts: List[str], config: dict, system_prompt: str = "",
     # 👇 根据配置决定是否关闭思考模式（与 call_api_with_prompt 保持一致）
     if api_cfg.get("enable_thinking") is False:
         payload["enable_thinking"] = False
-    
+
+    # 🔧 新增日志：打印本次请求的关键信息
+    print(f"[translate_online] 本批发送 {len(texts)} 句，System Prompt 长度: {len(system_prompt)} 字符")
+    print(f"[translate_online] User Prompt（前300字）:\n{user_prompt[:300]}...")
+
     for attempt in range(max_retries):
         try:
             resp = requests.post(url, json=payload, headers=headers, timeout=120)
@@ -137,9 +142,12 @@ def translate_batch(texts: List[str], config: dict, system_prompt: str = "",
                     text = match.group(2).strip()
                     zh_lines[idx] = text
             
+            # 🔧 新增日志：打印返回结果统计
+            print(f"[translate_online] API 返回 {len(zh_lines)} 行，期望 {len(texts)} 行")
+            
             # 校验行数
             if len(zh_lines) != len(texts):
-                print(f"[translate_online] 行数不匹配: 期望 {len(texts)}, 实际 {len(zh_lines)}")
+                print(f"[translate_online] ⚠️ 行数不匹配: 期望 {len(texts)}, 实际 {len(zh_lines)}")
                 if attempt < max_retries - 1:
                     wait = 1 + random.uniform(0, 1)
                     print(f"  等待 {wait:.1f}s 后重试...")
