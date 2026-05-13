@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-step1_generate_prompt.py - 使用在线 API 生成视频特定的翻译提示词
+step1_generate_prompt.py - 根据视频标题生成 Whisper initial_prompt
+职责：输出纯英文逗号分隔的专有名词列表，用于辅助 ASR 识别。
 """
 
 import re
@@ -9,80 +10,97 @@ from backend.pipeline.translate_online import call_api_with_prompt
 
 
 def extract_topic(video_path: Path) -> str:
+    """从文件名提取主题，保留中英文和数字"""
     stem = video_path.stem.replace('_', ' ')
-    stem = re.sub(r'[^a-zA-Z0-9_\u4e00-\u9fff]', ' ', stem)
+    # 保留字母、数字、中文、常见连接符
+    stem = re.sub(r'[^a-zA-Z0-9\u4e00-\u9fff\s\-]', ' ', stem)
     return re.sub(r'\s+', ' ', stem).strip()
 
 
-def generate_prompt(video_path: Path, config: dict) -> dict:
+def generate_prompt(video_path: Path, config: dict) -> str:
     """
-    生成视频特定的翻译辅助信息
-    返回: {
-        "domain": "italian_football",
-        "terms": [{"en": "Serie A", "zh": "意甲", "context": "联赛名称"}],
-        "style": "专业但轻松，保留主持人的口语化语气和情感表达",
-        "asr_hints": ["Serie R→意甲", "UVA→尤文图斯"]
-    }
+    生成 Whisper 的 initial_prompt 字符串。
+    返回: "Manchester United, Man Utd, Old Trafford, Bruno Fernandes, ..."
     """
     topic = extract_topic(video_path)
     
-    # 构建 prompt，让模型输出结构化的术语表和风格描述
-    prompt = f"""你是一个视频内容分析助手。请分析以下视频主题，输出该视频领域的专业术语对照表和翻译风格建议。
+    prompt = f"""# Role
+你是一个专业的体育/娱乐领域 ASR（语音识别）优化专家。你的任务是根据视频标题，为 Whisper 模型生成 `initial_prompt` 字符串。
 
-视频主题：{topic}
+# Goal
+根据用户提供的【视频主题/球队/比赛/人物】，输出一个由英文逗号 `,` 分隔的"专有名词列表"。这个列表将用于辅助 AI 识别音频中的人名、地名、术语和梗，防止拼写错误。
 
-请用 JSON 格式输出，不要添加任何额外说明：
-{{
-  "domain": "领域标签，如 italian_football, f1, general 等",
-  "terms": [
-    {{"en": "英文术语", "zh": "中文翻译", "context": "使用场景说明"}}
-  ],
-  "style": "翻译风格描述，如：专业但轻松，保留口语化语气",
-  "asr_hints": [
-    "常见 ASR 错误→正确文本，如：Serie R→意甲"
-  ]
-}}
+# Rules (Must Follow)
+1. **格式要求**：
+   - 纯文本，用英文逗号 `,` 分隔。
+   - 不要换行，不要加 bullet points，不要输出任何解释性文字。
+   - 直接输出结果字符串，前后不要加引号。
+2. **内容要求**：
+   - 主要输出英文拼写（因为 Whisper 听的是英文音频）。
+   - 包含：官方全名、常见昵称、缩写、主场名、教练/球星名、核心术语。
+   - 如果标题含中文（如"曼联"），先推理出对应的英文实体，再输出英文。
+   - 不要编造不确定的人名，只列该主题下最核心、最高频的 10-20 个词。
+3. **语言**：主要输出英文原词。非常生僻的中文特有梗可忽略。
 
-要求：
-1. terms 列出 5-15 个该领域最可能出现的专有名词
-2. asr_hints 列出 3-8 个语音识别容易出错的词
-3. 如果无法判断具体领域，domain 填 "general"，terms 留空列表
+# Examples
+
+## User Input:
+Manchester United 2024 squad
+
+## Your Output:
+Manchester United, Man Utd, Old Trafford, The Red Devils, Carrington, Erik ten Hag, Ten Hag, Gaffer, Bruno Fernandes, Bruno, Marcus Rashford, Rashy, Lisandro Martinez, Licha, Casemiro, Luke Shaw, Harry Maguire, Slabhead, Alejandro Garnacho, Garna, Rasmus Hojlund, Hojlund, Andre Onana, Mainoo, Kobbie, McTominay
+
+## User Input:
+Liverpool Klopp Era
+
+## Your Output:
+Liverpool FC, Anfield, The Kop, Jurgen Klopp, Klopp, Boss, Mohamed Salah, Mo Salah, Salah, Virgil van Dijk, Virgil, VVD, Trent Alexander-Arnold, Trent, Robertson, Robbo, Alisson Becker, Alisson, Jordan Henderson, Hendo, Sadio Mane, Firmino, Bobby, Gerrard
+
+## User Input:
+2018年NBA选秀是有史以来最伟大的选秀吗
+
+## Your Output:
+NBA Draft, 2018 NBA Draft, Luka Doncic, Doncic, Trae Young, Deandre Ayton, Marvin Bagley, Jaren Jackson Jr, Shai Gilgeous-Alexander, SGA, Michael Porter Jr, Collin Sexton, Miles Bridges, NBA, Draft, Lottery, Rookie, All-Star
+
+---
+# Task
+用户输入的主题是：
+{topic}
 """
 
     print(f"[step1] 视频主题: {topic}")
-    print(f"[step1] 发送 Prompt（前300字）:\n{prompt[:300]}...")
-    
+    print(f"[step1] 发送 ASR 提示词生成请求...")
+
     try:
-        response = call_api_with_prompt(config, prompt, max_tokens=1024, temperature=0.3)
-        print(f"[step1] API 原始返回（前500字）:\n{response[:500]}")
-        import json
+        response = call_api_with_prompt(config, prompt, max_tokens=512, temperature=0.2)
+        # 清理：去掉前后空白、引号、换行
+        cleaned = response.strip().strip('"').strip("'").replace('\n', ', ').replace('，', ', ')
+        # 去重相邻逗号和空格
+        cleaned = re.sub(r',\s*,', ',', cleaned)
+        cleaned = re.sub(r'\s+', ' ', cleaned)
         
-        # 优先提取 markdown 代码块，再尝试裸 JSON
-        match = re.search(r'```(?:json)?\s*(\{{.*?\}})\s*```', response, re.DOTALL)
-        if not match:
-            match = re.search(r'\{{.*\}}', response, re.DOTALL)
-        
-        if match:
-            json_str = match.group(1) if match.lastindex else match.group(0)
-            result = json.loads(json_str)
-            print(f"[step1] ✅ JSON 提取成功")
+        if len(cleaned) < 10:
+            print(f"[step1] ⚠️ 返回过短（{len(cleaned)} 字符），可能生成失败")
+            print(f"[step1] 原始返回: {response[:200]}")
+            cleaned = ""
         else:
-            result = {}
-            print("[step1] ⚠️ 未能在响应中提取 JSON，将使用默认值")
+            print(f"[step1] ✅ 生成成功，长度: {len(cleaned)} 字符")
+            print(f"[step1] 预览: {cleaned[:120]}...")
+        
+        return cleaned
+        
     except Exception as e:
-        print(f"[step1] ❌ 生成提示词失败: {e}，使用默认值")
-        result = {}
-    
-    # 确保字段存在
-    result.setdefault("domain", "general")
-    result.setdefault("terms", [])
-    result.setdefault("style", "专业、准确")
-    result.setdefault("asr_hints", [])
-    
-    print(f"[step1] 识别领域: {result['domain']}")
-    print(f"[step1] 术语数量: {len(result['terms'])}")
-    if result['terms']:
-        for t in result['terms'][:5]:
-            print(f"[step1]   - {t.get('en','')} → {t.get('zh','')}")
-    
-    return result
+        print(f"[step1] ❌ 生成失败: {e}")
+        return ""
+
+
+# 兼容旧接口：如果其他地方还调用 generate_prompt 并期望 dict，提供空 dict 回退
+def generate_prompt_legacy(video_path: Path, config: dict) -> dict:
+    """旧版兼容接口，返回空 dict（不再使用）"""
+    print("[step1] 警告：调用了已废弃的 generate_prompt_legacy")
+    return {
+        "domain": "general",
+        "terms": [],
+        "style": "",
+        "asr_hints": []
+    }

@@ -157,28 +157,11 @@ def _fallback_system_prompt(video_prompt: dict) -> str:
         "If any check fails, regenerate until all pass."
     )
 
-
-def generate_tailored_system_prompt(sampled_text: str, video_prompt: dict, config: dict) -> str:
+def generate_tailored_system_prompt(sampled_text: str, config: dict) -> str:
     """
     Gemini 建议的"母本 + LLM 改写"方案。
     基于采样字幕和 F1 母本，让 LLM 直接输出完整 System Prompt。
     """
-    auxiliary_parts = []
-    domain = video_prompt.get("domain", "general")
-    if domain and domain != "general":
-        auxiliary_parts.append(f"领域: {domain}")
-    if video_prompt.get("terms"):
-        auxiliary_parts.append("文件名分析提供的参考术语:")
-        for t in video_prompt.get("terms", [])[:8]:
-            auxiliary_parts.append(f"  - {t.get('en','')} → {t.get('zh','')} ({t.get('context','')})")
-    if video_prompt.get("style"):
-        auxiliary_parts.append(f"风格参考: {video_prompt['style']}")
-    if video_prompt.get("asr_hints"):
-        auxiliary_parts.append("ASR 纠错参考:")
-        for h in video_prompt.get("asr_hints", [])[:5]:
-            auxiliary_parts.append(f"  - {h}")
-    auxiliary = "\n".join(auxiliary_parts) if auxiliary_parts else "（无辅助信息）"
-
     prompt = f"""你是一位顶级提示词工程师。请根据以下视频字幕采样，改写"翻译母本"，生成一个精准适配该视频的翻译 System Prompt。
 
 【翻译母本】（这是结构参考，你必须保留其格式锁和整体结构，但将其中所有 F1 相关内容替换为当前视频的实际内容）
@@ -186,9 +169,6 @@ def generate_tailored_system_prompt(sampled_text: str, video_prompt: dict, confi
 
 【视频字幕采样】
 {sampled_text}
-
-【辅助信息】（来自文件名分析，可能为空）
-{auxiliary}
 
 【要求】
 1. 必须保留母本中的"🚨 CRITICAL RULES"、"❌ FORBIDDEN"和"FINAL CHECK"部分，结构和措辞不得改动。
@@ -204,23 +184,20 @@ def generate_tailored_system_prompt(sampled_text: str, video_prompt: dict, confi
 
     print(f"[tailor_prompt] 发送提示词定制请求...")
     print(f"[tailor_prompt] 采样字幕长度: {len(sampled_text)} 字符")
-    print(f"[tailor_prompt] 辅助信息:\n{auxiliary}")
 
     try:
         response = call_api_with_prompt(config, prompt, max_tokens=2500, temperature=0.2)
         tailored = response.strip()
         if len(tailored) < 500:
-            print(f"[tailor_prompt] ⚠️ 返回过短（{len(tailored)} 字符），可能未完整生成，将使用 fallback")
-            print(f"[tailor_prompt] 返回内容: {tailored[:200]}")
-            tailored = _fallback_system_prompt(video_prompt)
+            print(f"[tailor_prompt] ⚠️ 返回过短（{len(tailored)} 字符），使用 fallback")
+            tailored = _fallback_system_prompt({})
         else:
             print(f"[tailor_prompt] ✅ 生成成功，长度: {len(tailored)} 字符")
             print(f"[tailor_prompt] 预览（前600字）:\n{tailored[:600]}")
         return tailored
     except Exception as e:
         print(f"[tailor_prompt] ❌ 生成失败: {e}，使用 fallback")
-        return _fallback_system_prompt(video_prompt)
-
+        return _fallback_system_prompt({})
 
 def hierarchical_analyze(entries, config, progress_callback=None, progress_dict=None):
     """
@@ -407,7 +384,7 @@ def run_analysis_and_translate(en_txt_path: Path, config: dict, output_dir: Path
         if progress_dict is not None:
             progress_dict["percent"] = mapped
 
-    zh_entries = batch_translate(entries, video_prompt, config, translate_wrapper, None)
+    zh_entries = batch_translate(entries, {}, config, translate_wrapper, None)
     print(f"   翻译耗时 {time.time() - start_trans:.0f} 秒")
 
     print("📝 保留单行原文，不进行 Step3 预分割")

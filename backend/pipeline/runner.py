@@ -10,7 +10,7 @@ from backend.pipeline.heartbeat import heartbeat_updater
 async def run_pipeline(video_path: Path, config: dict, progress_callback: Callable[[str, int, float, float], Awaitable[None]]) -> Dict[str, str]:
     task_id = video_path.stem
 
-    # ===== 生成 safe_base_name：仅基于原始文件名，不再追加 task_id =====
+    # ===== 生成 safe_base_name =====
     original_filename = config.get("original_filename", video_path.name)
     safe_stem = Path(original_filename).stem
     safe_stem = re.sub(r'[\\/:*?"<>|]', '_', safe_stem)
@@ -49,34 +49,24 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
         from datetime import datetime
         await update_task(task_id, current_step=step_name, step_started_at=datetime.utcnow())
 
-    # ========== Step 1 ==========
-    video_prompt = {}
+    # ========== Step 1: 生成 ASR 提示词 ==========
+    initial_prompt = ""
     if features.get("enable_asr_prompt", True):
         await set_step_started("生成ASR提示词")
         await progress_callback("生成ASR提示词", 0, 0, None, force=True)
-        video_prompt = await asyncio.to_thread(
+        
+        initial_prompt = await asyncio.to_thread(
             step1_generate_prompt.generate_prompt, video_path, config
         )
+        
         await progress_callback("生成ASR提示词", 100, 0, None, force=True)
-        print(f"[runner] Step1 生成术语: {len(video_prompt.get('terms', []))} 个")
-        print(f"[runner] Step1 生成领域: {video_prompt.get('domain', 'general')}")
-        if video_prompt.get('terms'):
-            for t in video_prompt['terms'][:5]:
-                print(f"[runner]   - {t.get('en','')} → {t.get('zh','')}")
+        print(f"[runner] Step1 生成 ASR 提示词: {len(initial_prompt)} 字符")
+        if initial_prompt:
+            print(f"[runner] Step1 预览: {initial_prompt[:120]}...")
     else:
-        print("[runner] Step1 已关闭，跳过文件名提示词生成")
+        print("[runner] Step1 已关闭，跳过 ASR 提示词生成")
 
-    # 根据 Step 1 构造 Whisper 的 initial_prompt
-    initial_prompt = ""
-    if video_prompt:
-        terms_en = [t['en'] for t in video_prompt.get('terms', []) if t.get('en')]
-        hints_en = [h.split('→')[0].strip() for h in video_prompt.get('asr_hints', [])]
-        all_words = list(dict.fromkeys(terms_en + hints_en))
-        if all_words:
-            initial_prompt = ", ".join(all_words)
-            print(f"[runner] Whisper initial_prompt: {initial_prompt[:200]}")
-
-    # ========== Step 2 ==========
+    # ========== Step 2: 语音识别 ==========
     await set_step_started("语音识别")
     await progress_callback("语音识别", 0, 0, None, force=True)
     whisper_progress = {"percent": 0}
@@ -93,16 +83,11 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
         await safe_cancel(heartbeat_task2)
     await progress_callback("语音识别", 100, 0, None, force=True)
 
-    # ========== Step 2.5 删除：内容分析已并入 Step 3 ==========
-    print("[runner] Step 2.5 已移除，提示词定制由 Step 3 统一负责")
-
-    # 注意：这里不再需要 config = dict(config)，因为函数开头已经拷贝过
-    config["translate_backend"] = "online_api"
-
-    # ========== Step 3: 分析与翻译 ==========
+    # ========== Step 3: 分析与翻译（含提示词定制） ==========
     await set_step_started("分析与翻译")
     await progress_callback("分析与翻译", 0, 0, None, force=True)
 
+    config["translate_backend"] = "online_api"
     updater3 = make_sync_updater("分析与翻译")
     translate_progress = {"percent": 0}
 
@@ -112,13 +97,13 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     try:
         zh_srt_path, zh_txt_path, meta_path = await asyncio.to_thread(
             step3_analyze_and_translate.run_analysis_and_translate,
-            en_txt_path, config, output_dir, updater3, translate_progress, video_prompt
+            en_txt_path, config, output_dir, updater3, translate_progress, None  # video_prompt 不再需要
         )
     finally:
         await safe_cancel(heartbeat_task3)
     await progress_callback("分析与翻译", 100, 0, None, force=True)
 
-    # ========== Step 4 ==========
+    # ========== Step 4: 压制字幕 ==========
     await set_step_started("压制字幕")
     await progress_callback("压制字幕", 0, 0, None, force=True)
     updater4 = make_sync_updater("压制字幕")
