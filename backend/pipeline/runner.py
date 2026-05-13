@@ -11,17 +11,12 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     task_id = video_path.stem
 
     # ===== 生成 safe_base_name：仅基于原始文件名，不再追加 task_id =====
-    # 获取原始文件名（若未提供则用当前文件名）
     original_filename = config.get("original_filename", video_path.name)
-    # 提取文件名主体（去掉路径和扩展名）
     safe_stem = Path(original_filename).stem
-    # 移除 Windows/Unix 非法字符
     safe_stem = re.sub(r'[\\/:*?"<>|]', '_', safe_stem)
-    # 截断防止路径过长（保留合理长度）
     max_len = 50
     if len(safe_stem) > max_len:
         safe_stem = safe_stem[:max_len]
-    # 输出目录已经是 task_id 隔离，文件名无需再加 task_id 保证唯一性
     safe_base_name = safe_stem
     # =================================================
 
@@ -63,17 +58,13 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
             step1_generate_prompt.generate_prompt, video_path, config
         )
         await progress_callback("生成ASR提示词", 100, 0, None, force=True)
-        
-        # 🔧 新增日志：确认 Step1 产物
         print(f"[runner] Step1 生成术语: {len(video_prompt.get('terms', []))} 个")
         print(f"[runner] Step1 生成领域: {video_prompt.get('domain', 'general')}")
-        print(f"[runner] Step1 生成风格: {video_prompt.get('style', '无')[:60]}")
         if video_prompt.get('terms'):
-            print(f"[runner] Step1 术语预览:")
             for t in video_prompt['terms'][:5]:
                 print(f"[runner]   - {t.get('en','')} → {t.get('zh','')}")
     else:
-        print("[runner] Step1 已关闭（enable_asr_prompt=false），跳过文件名提示词生成")
+        print("[runner] Step1 已关闭，跳过文件名提示词生成")
 
     # 根据 Step 1 构造 Whisper 的 initial_prompt
     initial_prompt = ""
@@ -102,81 +93,18 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
         await safe_cancel(heartbeat_task2)
     await progress_callback("语音识别", 100, 0, None, force=True)
 
-    # ========== Step 2.5: 内容分析（进度合并到"分析与翻译"的前5%） ==========
-    content_prompt = {}
-    online_cfg = config.get("online_api", {})
-    use_content_analysis = bool(online_cfg.get("base_url") and online_cfg.get("api_key"))
-
-    if use_content_analysis:
-        print("[runner] 开始内容分析（进度将合并到分析与翻译的前5%）...")
-        try:
-            entries = step3_analyze_and_translate.parse_subtitle_entries(en_txt_path)
-            
-            step25_start_time = time.time()
-            def content_analysis_progress_wrapper(raw_progress: int, eta_sec: float = None):
-                mapped_progress = int(raw_progress * 0.05)  # 0-100% → 0-5%
-                elapsed = time.time() - step25_start_time
-                asyncio.run_coroutine_threadsafe(
-                    progress_callback("分析与翻译", mapped_progress, elapsed, eta_sec, force=True),
-                    loop
-                )
-
-            content_prompt = await asyncio.to_thread(
-                step3_analyze_and_translate.analyze_content_for_prompt,
-                entries, config, content_analysis_progress_wrapper
-            )
-            
-            # 🔧 新增日志：确认 Step2.5 产物
-            print(f"[runner] Step2.5 内容分析领域: {content_prompt.get('domain', 'general')}")
-            print(f"[runner] Step2.5 内容分析术语: {len(content_prompt.get('terms', []))} 个")
-            if content_prompt.get('terms'):
-                for t in content_prompt['terms'][:5]:
-                    print(f"[runner]   - {t.get('en','')} → {t.get('zh','')}")
-            
-            await progress_callback("分析与翻译", 5, 0, None, force=True)
-        except Exception as e:
-            print(f"[runner] 内容分析失败，将使用文件名提示词作为回退: {e}")
-            content_prompt = {}
-            await progress_callback("分析与翻译", 5, 0, None, force=True)
-    else:
-        print("[runner] 在线 API 未完整配置，跳过内容分析")
-        await progress_callback("分析与翻译", 5, 0, None, force=True)
-
-    # 合并提示词（内容分析为主，文件名预测补充）
-    merged_video_prompt = video_prompt.copy()
-    if content_prompt:
-        content_terms = content_prompt.get("terms", [])
-        video_terms = merged_video_prompt.get("terms", [])
-        existing_en = {t['en'].lower() for t in content_terms}
-        for vt in video_terms:
-            if vt['en'].lower() not in existing_en:
-                content_terms.append(vt)
-        merged_video_prompt["terms"] = content_terms
-        merged_video_prompt["style"] = content_prompt.get("style", merged_video_prompt.get("style", ""))
-        merged_video_prompt["domain"] = content_prompt.get("domain", merged_video_prompt.get("domain", "general"))
-        content_hints = content_prompt.get("asr_hints", [])
-        video_hints = merged_video_prompt.get("asr_hints", [])
-        seen_hints = set(h.lower() for h in content_hints)
-        for vh in video_hints:
-            if vh.lower() not in seen_hints:
-                content_hints.append(vh)
-        merged_video_prompt["asr_hints"] = content_hints
-
-    # 🔧 新增日志：打印合并后的最终提示词摘要
-    print(f"[runner] 合并后术语总数: {len(merged_video_prompt.get('terms', []))}")
-    print(f"[runner] 合并后领域: {merged_video_prompt.get('domain', 'general')}")
-    print(f"[runner] 合并后风格: {merged_video_prompt.get('style', '默认')[:60]}")
-    print(f"[runner] 合并后 ASR hints: {len(merged_video_prompt.get('asr_hints', []))}")
+    # ========== Step 2.5 删除：内容分析已并入 Step 3 ==========
+    print("[runner] Step 2.5 已移除，提示词定制由 Step 3 统一负责")
 
     # 注意：这里不再需要 config = dict(config)，因为函数开头已经拷贝过
     config["translate_backend"] = "online_api"
 
     # ========== Step 3: 分析与翻译 ==========
     await set_step_started("分析与翻译")
-    await progress_callback("分析与翻译", 5, 0, None, force=True)
+    await progress_callback("分析与翻译", 0, 0, None, force=True)
 
     updater3 = make_sync_updater("分析与翻译")
-    translate_progress = {"percent": 5}  # 与分析阶段起点对齐
+    translate_progress = {"percent": 0}
 
     heartbeat_task3 = asyncio.create_task(
         heartbeat_updater("分析与翻译", progress_callback, lambda: translate_progress["percent"])
@@ -184,7 +112,7 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     try:
         zh_srt_path, zh_txt_path, meta_path = await asyncio.to_thread(
             step3_analyze_and_translate.run_analysis_and_translate,
-            en_txt_path, config, output_dir, updater3, translate_progress, merged_video_prompt
+            en_txt_path, config, output_dir, updater3, translate_progress, video_prompt
         )
     finally:
         await safe_cancel(heartbeat_task3)
