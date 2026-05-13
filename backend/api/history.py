@@ -36,14 +36,15 @@ async def list_tasks(
                 "status": t.status,
                 "progress": t.progress,
                 "current_step": t.current_step,
-                "created_at": t.created_at.isoformat() if t.created_at else None,
-                "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+                # 🔧 修复：加上 'Z' 标记 UTC，前端 new Date() 会自动转本地时区
+                "created_at": t.created_at.isoformat() + 'Z' if t.created_at else None,
+                "updated_at": t.updated_at.isoformat() + 'Z' if t.updated_at else None,
                 "error_message": t.error_message,
                 "output_video_path": t.output_video_path,
                 "output_zh_srt": t.output_zh_srt,
                 "output_en_srt": t.output_en_srt,
                 "output_meta": t.output_meta,
-                "original_filename": t.original_filename,  # 新增
+                "original_filename": t.original_filename,
             }
             for t in tasks
         ]
