@@ -363,7 +363,7 @@ def run_analysis_and_translate(en_txt_path: Path, config: dict, output_dir: Path
     sampled_text = _build_sample_text(entries)
     print(f"[run_analysis_and_translate] 采样 {len(sampled_text)} 字符用于提示词定制")
     
-    tailored_prompt = generate_tailored_system_prompt(sampled_text, video_prompt, config)
+    tailored_prompt = generate_tailored_system_prompt(sampled_text,config)
     config["translation_system_prompt"] = tailored_prompt
 
     if progress_callback:

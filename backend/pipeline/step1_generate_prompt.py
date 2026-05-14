@@ -22,7 +22,9 @@ def generate_prompt(video_path: Path, config: dict) -> str:
     生成 Whisper 的 initial_prompt 字符串。
     返回: "Manchester United, Man Utd, Old Trafford, Bruno Fernandes, ..."
     """
-    topic = extract_topic(video_path)
+    # 优先使用用户上传时的原始文件名，而不是服务器上的 UUID
+    original = config.get("original_filename", video_path.name)
+    topic = extract_topic(Path(original))
     
     prompt = f"""# Role
 你是一个专业的体育/娱乐领域 ASR（语音识别）优化专家。你的任务是根据视频标题，为 Whisper 模型生成 `initial_prompt` 字符串。
