@@ -386,9 +386,59 @@
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
+      align-items: center;
     }
     .history-card .card-actions .el-button {
       font-size: 12px;
+      margin-left: 0;
+    }
+
+    /* ✂️ 裁剪相关样式 */
+    .crop-list {
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--glass-border);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .crop-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .crop-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* ✂️ 对话框深色模式覆盖 */
+    .el-overlay .el-dialog {
+      background: var(--bg-secondary) !important;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow-glass);
+    }
+    .el-dialog__title {
+      color: var(--text-primary) !important;
+    }
+    .el-dialog__body {
+      color: var(--text-primary) !important;
+    }
+    .el-dialog .el-input__wrapper {
+      background: rgba(255,255,255,0.05) !important;
+      box-shadow: none !important;
+      border: 1px solid var(--glass-border) !important;
+    }
+    .el-dialog .el-input__wrapper:hover, .el-dialog .el-input__wrapper.is-focus {
+      border-color: var(--accent-cyan) !important;
+    }
+    .el-dialog .el-input__inner {
+      color: var(--text-primary) !important;
     }
 
     /* 配置卡片 */
@@ -610,15 +660,41 @@
               <span>📅 {{ formatDate(item.created_at) }}</span>
               <span v-if="item.original_filename">📦 未知大小</span>
             </div>
+            
             <div class="card-actions">
               <template v-if="item.status === 'success'">
-                <el-button size="small" @click="downloadHistoryFile(item.task_id, 'video')" v-if="item.output_video_path">🎬 视频</el-button>
+                <el-button size="small" @click="downloadHistoryFile(item.task_id, 'video')" v-if="item.output_video_path">🎬 原版</el-button>
                 <el-button size="small" @click="downloadHistoryFile(item.task_id, 'zh_srt')" v-if="item.output_zh_srt">🇨🇳 中字</el-button>
                 <el-button size="small" @click="downloadHistoryFile(item.task_id, 'en_srt')" v-if="item.output_en_srt">🇬🇧 英字</el-button>
                 <el-button size="small" @click="downloadHistoryFile(item.task_id, 'meta')" v-if="item.output_meta">📄 元数据</el-button>
+                <el-button size="small" type="primary" plain @click="openCropDialog(item.task_id)">✂️ 裁剪</el-button>
               </template>
               <el-button size="small" type="danger" @click="deleteTask(item.task_id)">🗑 删除</el-button>
+              
+              <!-- 展开裁剪列表开关 -->
+              <el-button size="small" type="info" text @click="toggleCrops(item)" v-if="item.status === 'success'" style="margin-left: auto;">
+                {{ item.showCrops ? '收起裁剪版 ▲' : '查看裁剪版 ▼' }}
+              </el-button>
             </div>
+
+            <!-- ✂️ 展开的裁剪列表区域 -->
+            <div v-if="item.showCrops" class="crop-list">
+              <div v-if="!item.cropsLoaded" style="font-size:12px; color:var(--text-secondary);">加载中...</div>
+              <div v-else-if="item.crops.length === 0" style="font-size:12px; color:var(--text-secondary);">暂无裁剪记录</div>
+              <div v-else v-for="crop in item.crops" :key="crop.crop_id" class="crop-item">
+                <div class="crop-info">
+                  <span>✂️ 裁剪片段数: {{ crop.parsedSegments ? crop.parsedSegments.length : 0 }}</span>
+                  <el-tag :type="crop.status === 'success' ? 'success' : crop.status === 'failed' ? 'danger' : 'warning'" size="small">
+                    {{ crop.status === 'success' ? '成功' : crop.status === 'failed' ? '失败' : '处理中' }}
+                  </el-tag>
+                </div>
+                <div class="crop-action">
+                  <el-button v-if="crop.status === 'success'" size="small" type="primary" link @click="downloadCropFile(crop.crop_id)">⬇️ 下载</el-button>
+                  <div v-if="crop.status === 'failed'" style="font-size: 12px; color: var(--danger)" :title="crop.error_message">失败详情</div>
+                </div>
+              </div>
+            </div>
+            
           </div>
           <div v-if="filteredHistoryTasks.length === 0" style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">
             📭 暂无历史任务
@@ -778,6 +854,33 @@
       </div>
     </el-tab-pane>
   </el-tabs>
+
+  <!-- ==================== ✂️ 裁剪对话框 ==================== -->
+  <el-dialog v-model="cropDialogVisible" title="✂️ 视频片段裁剪" width="500px">
+    <div style="margin-bottom: 16px; font-size: 13px; color: var(--text-secondary);">
+      请输入你要保留的视频片段（支持 00:01:00 格式或直接输入秒数）。最终会将所有片段按照顺序无缝拼接到一起。
+    </div>
+    
+    <div v-for="(seg, idx) in cropSegments" :key="idx" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+      <span style="white-space: nowrap; font-size: 13px; color: var(--text-secondary);">片段 {{ idx + 1 }}:</span>
+      <el-input v-model="seg.start" placeholder="起始 (如 00:00:00)" style="flex: 1;" />
+      <span style="color: var(--text-secondary);">-</span>
+      <el-input v-model="seg.end" placeholder="结束 (如 00:01:30)" style="flex: 1;" />
+      <el-button type="danger" plain size="small" @click="removeCropSegment(idx)" :disabled="cropSegments.length <= 1">X</el-button>
+    </div>
+
+    <el-button type="primary" plain size="small" @click="addCropSegment" style="width: 100%; margin-top: 10px; border-style: dashed;">
+      + 添加保留时间段
+    </el-button>
+    
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="cropDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="cropSubmitting" @click="submitCrop">🚀 提交裁剪后台任务</el-button>
+      </span>
+    </template>
+  </el-dialog>
+
 </div>
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
@@ -901,7 +1004,7 @@
       onUnmounted(() => { stopPolling(); stopElapsedTimer(); });
 
       // ========== 配置 ==========
-      const topicPreset = ref('');  // 预设选择
+      const topicPreset = ref('');  
 
       const configForm = reactive({
         features: {
@@ -936,7 +1039,6 @@
       });
       const configSaved = ref(false);
 
-      // 主题变化处理
       const onTopicChange = (val) => {
         if (val === 'custom') {
           configForm.local_translation.topic = '';
@@ -958,7 +1060,6 @@
           if (data.translate_backend) configForm.translate_backend = data.translate_backend;
           if (data.local_translation) {
             Object.assign(configForm.local_translation, data.local_translation);
-            // 同步 preset 显示
             const topic = data.local_translation.topic;
             const presets = ['', 'football', 'f1', 'basketball', 'esports'];
             topicPreset.value = presets.includes(topic) ? topic : (topic ? 'custom' : '');
@@ -985,10 +1086,11 @@
 
       onMounted(fetchConfig);
 
-      // ========== 历史 ==========
+      // ========== 📜 历史与裁剪 ==========
       const historyFilter = reactive({ status: '', search: '' });
       const historyTasks = ref([]);
       let allHistoryTasks = [];
+      const expandedTaskIds = ref(new Set()); // 记录哪些任务展开了裁剪列表
 
       const fetchHistory = async () => {
         try {
@@ -996,8 +1098,24 @@
           if (historyFilter.status) params.append('status', historyFilter.status);
           const res = await fetch(`/api/tasks?${params.toString()}`);
           const data = await res.json();
-          allHistoryTasks = data.tasks || [];
+          
+          // 巧妙地合并旧的状态（如展开状态、是否加载了 crops），保持前端响应平滑
+          allHistoryTasks = (data.tasks || []).map(t => {
+            const show = expandedTaskIds.value.has(t.task_id);
+            const existing = allHistoryTasks.find(old => old.task_id === t.task_id);
+            return {
+              ...t,
+              crops: existing ? existing.crops : [],
+              cropsLoaded: existing ? existing.cropsLoaded : false,
+              showCrops: show
+            };
+          });
           applyHistoryFilter();
+
+          // 自动静默拉取目前正在展开的裁剪列表最新状态
+          for (const taskId of expandedTaskIds.value) {
+            fetchCropsForTask(taskId);
+          }
         } catch (e) { console.error('获取历史失败', e); }
       };
 
@@ -1010,7 +1128,8 @@
             t.task_id.toLowerCase().includes(keyword)
           );
         }
-        historyTasks.value = filtered;
+        // 重新赋值给 ref 触发视图更新
+        historyTasks.value = [...filtered];
       };
 
       const filteredHistoryTasks = computed(() => historyTasks.value);
@@ -1041,35 +1160,134 @@
         return d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
       };
 
+      // --- ✂️ 裁剪拉取相关 ---
+      const toggleCrops = async (task) => {
+        task.showCrops = !task.showCrops;
+        if (task.showCrops) {
+          expandedTaskIds.value.add(task.task_id);
+          await fetchCropsForTask(task.task_id);
+        } else {
+          expandedTaskIds.value.delete(task.task_id);
+        }
+      };
+
+      const fetchCropsForTask = async (taskId) => {
+        const task = allHistoryTasks.find(t => t.task_id === taskId);
+        if (!task) return;
+        try {
+          const res = await fetch(`/api/tasks/${taskId}/crops`);
+          const data = await res.json();
+          let cropsArray = Array.isArray(data) ? data : (data.crops || []);
+          
+          // 安全解析 JSON，避免前端报错
+          cropsArray.forEach(c => {
+            try {
+              c.parsedSegments = c.segments ? JSON.parse(c.segments) : [];
+            } catch(e) {
+              c.parsedSegments = [];
+            }
+          });
+          task.crops = cropsArray;
+          task.cropsLoaded = true;
+          applyHistoryFilter(); // 更新视图
+        } catch (e) {
+          console.error('获取裁剪记录失败', e);
+        }
+      };
+
+      const downloadCropFile = (cropId) => {
+        window.open(`/api/download/crop/${cropId}/video`);
+      };
+
+      // --- ✂️ 裁剪提交相关 ---
+      const cropDialogVisible = ref(false);
+      const currentCropTaskId = ref('');
+      const cropSegments = ref([{ start: '00:00:00', end: '00:01:00' }]);
+      const cropSubmitting = ref(false);
+
+      const openCropDialog = (taskId) => {
+        currentCropTaskId.value = taskId;
+        cropSegments.value = [{ start: '00:00:00', end: '00:01:00' }];
+        cropDialogVisible.value = true;
+      };
+
+      const addCropSegment = () => {
+        cropSegments.value.push({ start: '', end: '' });
+      };
+
+      const removeCropSegment = (index) => {
+        cropSegments.value.splice(index, 1);
+      };
+
+      const timeToSeconds = (timeStr) => {
+        if (!timeStr) return -1;
+        const parts = timeStr.split(':');
+        if (parts.length === 3) {
+          return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2]);
+        } else if (!isNaN(timeStr)) {
+          return parseFloat(timeStr);
+        }
+        return -1;
+      };
+
+      const submitCrop = async () => {
+        // 校验表单
+        for (let i = 0; i < cropSegments.value.length; i++) {
+          const seg = cropSegments.value[i];
+          const s = timeToSeconds(seg.start);
+          const e = timeToSeconds(seg.end);
+          if (s < 0 || e < 0 || s >= e) {
+            ElementPlus.ElMessage.error(`第 ${i+1} 段格式错误，或起始时间大于等于结束时间`);
+            return;
+          }
+        }
+
+        cropSubmitting.value = true;
+        try {
+          const res = await fetch(`/api/tasks/${currentCropTaskId.value}/crop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ segments: cropSegments.value })
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || '裁剪提交失败');
+          }
+          ElementPlus.ElMessage.success('裁剪后台任务已提交');
+          cropDialogVisible.value = false;
+          
+          // 如果当前任务列表没展开该项的 crops，就自动展开
+          const task = allHistoryTasks.find(t => t.task_id === currentCropTaskId.value);
+          if (task && !task.showCrops) {
+            task.showCrops = true;
+            expandedTaskIds.value.add(task.task_id);
+          }
+          // 提交后拉取一次最新状态显示 (处理中)
+          fetchCropsForTask(currentCropTaskId.value);
+
+        } catch (err) {
+          ElementPlus.ElMessage.error(err.message);
+        } finally {
+          cropSubmitting.value = false;
+        }
+      };
+
       onMounted(fetchHistory);
 
       return {
-        activeTab,
-        fileList,
-        selectedFile,
-        uploading,
-        task,
-        steps,
-        elapsedSec,
-        etaSec,
-        onFileChange,
-        uploadVideo,
-        formatTime,
-        formatFileSize,
-        resetMain,
-        configForm,
-        configSaved,
-        saveConfig,
-        topicPreset,
-        onTopicChange,
-        historyFilter,
-        historyTasks,
-        filteredHistoryTasks,
-        fetchHistory,
-        deleteTask,
-        cleanupCompleted,
-        downloadHistoryFile,
-        formatDate,
+        // 主流程
+        activeTab, fileList, selectedFile, uploading, task, steps, elapsedSec, etaSec,
+        onFileChange, uploadVideo, formatTime, formatFileSize, resetMain,
+        // 配置
+        configForm, configSaved, saveConfig, topicPreset, onTopicChange,
+        // 历史列表
+        historyFilter, historyTasks, filteredHistoryTasks, fetchHistory, deleteTask,
+        cleanupCompleted, downloadHistoryFile, formatDate,
+        // 裁剪展示与下载
+        toggleCrops, downloadCropFile,
+        // 裁剪弹窗相关
+        cropDialogVisible, currentCropTaskId, cropSegments, cropSubmitting,
+        openCropDialog, addCropSegment, removeCropSegment, submitCrop
       };
     }
   });

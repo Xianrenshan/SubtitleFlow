@@ -32,7 +32,6 @@ class TaskDB(Base):
     step_elapsed_sec = Column(Float, nullable=True)
     eta_sec = Column(Float, nullable=True)
     step_started_at = Column(DateTime, nullable=True)
-    # 新增：原始文件名
     original_filename = Column(String, nullable=True)
 
 class TaskResponse(BaseModel):
@@ -49,3 +48,16 @@ class TaskResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ==================== 新增：裁剪记录模型 ====================
+class CropRecord(Base):
+    __tablename__ = "crops"
+
+    crop_id = Column(String, primary_key=True)
+    task_id = Column(String, nullable=False, index=True)
+    segments = Column(JSON, nullable=False)          # [{"start":"00:01:00","end":"00:02:00"},...]
+    status = Column(String, default="processing")
+    output_path = Column(String, nullable=True)
+    error_message = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
