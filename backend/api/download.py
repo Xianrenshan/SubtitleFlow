@@ -2,11 +2,41 @@ import re
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
-from backend.database import get_task
+from backend.database import get_task, get_crop
 
 router = APIRouter()
 
 
+# ========== 1. 先放裁剪下载，避免被 /download/{task_id}/{file_type} 吞掉 ==========
+@router.get("/download/crop/{crop_id}")
+async def download_crop(crop_id: str):
+    from backend.database import get_crop
+    crop = await get_crop(crop_id)
+    if not crop or crop.status != "success" or not crop.output_path:
+        raise HTTPException(404, "裁剪任务未完成或不存在")
+    if not Path(crop.output_path).exists():
+        raise HTTPException(404, "裁剪文件已被清理")
+
+    # ========== 新增：关联查询原任务，获取原始文件名 ==========
+    task = await get_task(crop.task_id)
+    original = task.original_filename if task else None
+
+    if original:
+        stem = _sanitize_filename(original)
+        download_filename = f"{stem}_subtitled_cut.mp4"
+    else:
+        # 兜底：无原始文件名时回退到编码名
+        download_filename = f"crop_{crop_id}.mp4"
+    # =======================================================
+
+    return FileResponse(
+        crop.output_path,
+        filename=download_filename,
+        media_type="video/mp4"
+    )
+
+
+# ========== 2. 再放常规任务下载 ==========
 def _sanitize_filename(name: str, max_len: int = 60) -> str:
     """清理 Windows / 浏览器不允许的字符，截断长度"""
     # 去掉扩展名，只保留主干
