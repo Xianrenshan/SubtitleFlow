@@ -55,10 +55,17 @@ def call_api_with_prompt(config: dict, prompt: str, system_prompt: Optional[str]
         "stream": False
     }
     
-    # 关闭思考模式
-    if api_cfg.get("enable_thinking") is False:
+    # ========== 修改点 1：enable_thinking 处理逻辑 ==========
+    # 原逻辑：仅在配置值为 False 时才发送 enable_thinking=false
+    # 问题：百炼 deepseek-v4-pro 默认开启思考，如果用户没配置该字段（None），就不会发送，导致模型输出思考链污染字幕
+    # 新逻辑：字幕翻译场景默认关闭思考；仅当用户显式设为 True 时才开启
+    enable_thinking = api_cfg.get("enable_thinking")
+    if enable_thinking is True:
+        payload["enable_thinking"] = True
+    else:
         payload["enable_thinking"] = False
-    
+    # =========================================================
+
     resp = requests.post(url, json=payload, headers=headers, timeout=120)
     resp.raise_for_status()
     data = resp.json()
@@ -111,11 +118,17 @@ def translate_batch(texts: List[str], config: dict, system_prompt: str = "",
         "stream": False
     }
     
-    # 👇 根据配置决定是否关闭思考模式（与 call_api_with_prompt 保持一致）
-    if api_cfg.get("enable_thinking") is False:
+    # ========== 修改点 2：同步 translate_batch 的思考模式逻辑 ==========
+    # 原逻辑：仅在配置值为 False 时才发送 enable_thinking=false
+    # 新逻辑：与 call_api_with_prompt 保持一致，默认关闭思考
+    enable_thinking = api_cfg.get("enable_thinking")
+    if enable_thinking is True:
+        payload["enable_thinking"] = True
+    else:
         payload["enable_thinking"] = False
+    # =========================================================
 
-    # 🔧 新增日志：打印本次请求的关键信息
+    # 新增日志：打印本次请求的关键信息
     print(f"[translate_online] 本批发送 {len(texts)} 句，System Prompt 长度: {len(system_prompt)} 字符")
     print(f"[translate_online] User Prompt（前300字）:\n{user_prompt[:300]}...")
 
@@ -142,7 +155,7 @@ def translate_batch(texts: List[str], config: dict, system_prompt: str = "",
                     text = match.group(2).strip()
                     zh_lines[idx] = text
             
-            # 🔧 新增日志：打印返回结果统计
+            # 新增日志：打印返回结果统计
             print(f"[translate_online] API 返回 {len(zh_lines)} 行，期望 {len(texts)} 行")
             
             # 校验行数

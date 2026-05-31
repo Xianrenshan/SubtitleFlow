@@ -1,6 +1,7 @@
 from pathlib import Path
 from faster_whisper import WhisperModel
 import re
+import math
 
 
 def format_timestamp(seconds: float) -> str:
@@ -82,6 +83,109 @@ def write_txt(entries: list, txt_path: Path):
         for e in entries:
             f.write(f"{e['index']}\n{e['start']} --> {e['end']}\n{e['text']}\n\n")
 
+
+def _split_segment_by_words(segment, max_event_chars: int = 100, max_event_duration: float = 8.0):
+    """
+    利用 faster-whisper 的词级时间戳拆分超长 segment。
+    仅当文本过长（>max_event_chars）或时间过长（>max_event_duration）时触发。
+
+    返回: list[dict] 每个 dict 包含 start(float), end(float), text(str)
+    如果不需要拆分或无法拆分，返回 None。
+    """
+    words = getattr(segment, "words", None)
+    if not words:
+        return None
+
+    text = segment.text.strip()
+    duration = segment.end - segment.start
+    total_chars = len(text)
+
+    # 不满足拆分条件，保持原样
+    if total_chars <= max_event_chars and duration <= max_event_duration:
+        return None
+
+    # 计算目标份数：确保每份平均不超过 max_event_chars
+    n_chunks = max(2, math.ceil(total_chars / max_event_chars))
+    target_words = max(3, math.ceil(len(words) / n_chunks))
+
+    chunks = []
+    current_chunk = []
+    current_chars = 0
+
+    for i, word in enumerate(words):
+        word_text = getattr(word, "word", "")
+        current_chunk.append(word)
+        current_chars += len(word_text.strip())
+
+        is_last = (i == len(words) - 1)
+        should_split = False
+
+        # 触发切分的条件（满足任一即可）
+        if current_chars >= max_event_chars:
+            should_split = True
+        elif len(current_chunk) >= target_words * 1.5:
+            should_split = True
+        elif len(current_chunk) >= target_words and current_chars >= max_event_chars * 0.6:
+            should_split = True
+
+        if should_split and not is_last:
+            # 寻找最佳切分点：在 chunk 后半部分倒序找标点或长停顿
+            best_idx = len(current_chunk) - 1
+            search_start = max(0, len(current_chunk) - 8)
+
+            for j in range(len(current_chunk) - 1, search_start - 1, -1):
+                w_obj = current_chunk[j]
+                w_txt = getattr(w_obj, "word", "").strip()
+
+                # 优先在标点处切分
+                if w_txt and w_txt[-1] in ".,!?;:":
+                    best_idx = j
+                    break
+
+                # 其次在长停顿处切分（当前词结束与下一个词开始间隔 > 0.4s）
+                if j < len(current_chunk) - 1:
+                    gap = current_chunk[j + 1].start - w_obj.end
+                    if gap > 0.4:
+                        best_idx = j
+                        break
+
+            split_chunk = current_chunk[:best_idx + 1]
+            remaining = current_chunk[best_idx + 1:]
+
+            # 安全兜底：避免切出单词片段
+            if len(split_chunk) < 2 and remaining:
+                split_chunk = current_chunk[:target_words]
+                remaining = current_chunk[target_words:]
+
+            if split_chunk:
+                chunk_text = "".join(getattr(w, "word", "") for w in split_chunk).strip()
+                if chunk_text:
+                    chunks.append({
+                        "start": split_chunk[0].start,
+                        "end": split_chunk[-1].end,
+                        "text": chunk_text
+                    })
+
+            current_chunk = remaining
+            current_chars = sum(len(getattr(w, "word", "").strip()) for w in remaining)
+
+    # 处理剩余词
+    if current_chunk:
+        chunk_text = "".join(getattr(w, "word", "") for w in current_chunk).strip()
+        if chunk_text:
+            chunks.append({
+                "start": current_chunk[0].start,
+                "end": current_chunk[-1].end,
+                "text": chunk_text
+            })
+
+    # 如果最终只得到 1 份，说明拆分失败或不需要拆，保持原样
+    if len(chunks) <= 1:
+        return None
+
+    return chunks
+
+
 def run_whisper(video_path: Path, config: dict, prompt_text: str = "", output_dir: Path = None,
                 progress_callback=None, progress_dict=None):
     if output_dir is None:
@@ -107,6 +211,7 @@ def run_whisper(video_path: Path, config: dict, prompt_text: str = "", output_di
         vad_filter=True,
         vad_parameters=dict(min_silence_duration_ms=500),
         condition_on_previous_text=False,
+        word_timestamps=True,  # ← 关键：开启词级时间戳，用于超长段拆分
     )
     
     total_duration = info.duration
@@ -114,15 +219,48 @@ def run_whisper(video_path: Path, config: dict, prompt_text: str = "", output_di
     txt_path = output_dir / f"{safe_base_name}.txt"
 
     raw_entries = []
+    entry_idx = 1  # 连续编号，拆分后自动递增
+
     with open(srt_path, "w", encoding="utf-8") as f_srt, open(txt_path, "w", encoding="utf-8") as f_txt:
-        for i, segment in enumerate(segments, start=1):
+        for segment in segments:
             start_str = format_timestamp(segment.start)
             end_str = format_timestamp(segment.end)
             text = segment.text.strip()
-            
-            f_srt.write(f"{i}\n{start_str} --> {end_str}\n{text}\n\n")
-            f_txt.write(f"{i}\n{start_str} --> {end_str}\n{text}\n\n")
 
+            # 尝试利用词级时间戳拆分超长 segment
+            sub_segments = _split_segment_by_words(segment)
+
+            if sub_segments:
+                # 拆分成功：写入多个独立的 subtitle 事件
+                for sub in sub_segments:
+                    sub_start = format_timestamp(sub["start"])
+                    sub_end = format_timestamp(sub["end"])
+                    sub_text = sub["text"]
+
+                    f_srt.write(f"{entry_idx}\n{sub_start} --> {sub_end}\n{sub_text}\n\n")
+                    f_txt.write(f"{entry_idx}\n{sub_start} --> {sub_end}\n{sub_text}\n\n")
+
+                    raw_entries.append({
+                        'index': entry_idx,
+                        'start': sub_start,
+                        'end': sub_end,
+                        'text': sub_text
+                    })
+                    entry_idx += 1
+            else:
+                # 不拆分：保持原样写入
+                f_srt.write(f"{entry_idx}\n{start_str} --> {end_str}\n{text}\n\n")
+                f_txt.write(f"{entry_idx}\n{start_str} --> {end_str}\n{text}\n\n")
+
+                raw_entries.append({
+                    'index': entry_idx,
+                    'start': start_str,
+                    'end': end_str,
+                    'text': text
+                })
+                entry_idx += 1
+
+            # 进度更新（仍以原始 segment 的 end 时间为准，避免进度回跳）
             if total_duration > 0:
                 percent = int((segment.end / total_duration) * 100)
             else:
@@ -131,13 +269,6 @@ def run_whisper(video_path: Path, config: dict, prompt_text: str = "", output_di
                 progress_dict["percent"] = percent
             if progress_callback:
                 progress_callback(percent, None)
-            
-            raw_entries.append({
-                'index': i,
-                'start': start_str,
-                'end': end_str,
-                'text': text
-            })
 
     print(f"📏 原始字幕共 {len(raw_entries)} 句，检查是否需要视觉换行...")
     

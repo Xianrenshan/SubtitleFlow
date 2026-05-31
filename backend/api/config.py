@@ -65,6 +65,7 @@ class OnlineApiConfig(BaseModel):
     batch_mode: bool = False
     batch_size: int = 5
     request_delay: float = 0.5
+    enable_thinking: Optional[bool] = None   # ← 新增
 
 class ConfigUpdate(BaseModel):
     features: Optional[FeaturesConfig] = None
