@@ -7,6 +7,7 @@ from backend.pipeline import step1_generate_prompt, step2_whisper, step3_analyze
 from backend.database import update_task
 from backend.pipeline.heartbeat import heartbeat_updater
 
+
 async def run_pipeline(video_path: Path, config: dict, progress_callback: Callable[[str, int, float, float], Awaitable[None]]) -> Dict[str, str]:
     task_id = video_path.stem
 
@@ -37,11 +38,11 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     def make_sync_updater(step_name: str):
         import time
         started = time.time()
+
         def update(progress: int, eta_sec: float = None):
             elapsed = time.time() - started
             asyncio.run_coroutine_threadsafe(
-                progress_callback(step_name, progress, elapsed, eta_sec),
-                loop
+                progress_callback(step_name, progress, elapsed, eta_sec), loop
             )
         return update
 
@@ -54,11 +55,9 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     if features.get("enable_asr_prompt", True):
         await set_step_started("生成ASR提示词")
         await progress_callback("生成ASR提示词", 0, 0, None, force=True)
-        
         initial_prompt = await asyncio.to_thread(
             step1_generate_prompt.generate_prompt, video_path, config
         )
-        
         await progress_callback("生成ASR提示词", 100, 0, None, force=True)
         print(f"[runner] Step1 生成 ASR 提示词: {len(initial_prompt)} 字符")
         if initial_prompt:
@@ -75,9 +74,9 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
         heartbeat_updater("语音识别", progress_callback, lambda: whisper_progress["percent"])
     )
     try:
-        en_srt_path, en_txt_path = await asyncio.to_thread(
-            step2_whisper.run_whisper,
-            video_path, config, initial_prompt, output_dir, updater2, whisper_progress
+        # 🆕 Step2 现在返回 3 个值：srt, txt, words_json
+        en_srt_path, en_txt_path, words_json_path = await asyncio.to_thread(
+            step2_whisper.run_whisper, video_path, config, initial_prompt, output_dir, updater2, whisper_progress
         )
     finally:
         await safe_cancel(heartbeat_task2)
@@ -86,18 +85,16 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     # ========== Step 3: 分析与翻译（含提示词定制） ==========
     await set_step_started("分析与翻译")
     await progress_callback("分析与翻译", 0, 0, None, force=True)
-
     config["translate_backend"] = "online_api"
     updater3 = make_sync_updater("分析与翻译")
     translate_progress = {"percent": 0}
-
     heartbeat_task3 = asyncio.create_task(
         heartbeat_updater("分析与翻译", progress_callback, lambda: translate_progress["percent"])
     )
     try:
         zh_srt_path, zh_txt_path, meta_path = await asyncio.to_thread(
             step3_analyze_and_translate.run_analysis_and_translate,
-            en_txt_path, config, output_dir, updater3, translate_progress, None  # video_prompt 不再需要
+            en_txt_path, config, output_dir, updater3, translate_progress, None
         )
     finally:
         await safe_cancel(heartbeat_task3)
@@ -109,10 +106,10 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     updater4 = make_sync_updater("压制字幕")
     output_video = await asyncio.to_thread(
         step4_burn_subtitles.burn_subtitles,
-        video_path, en_srt_path, zh_srt_path, output_dir, meta_path, config, updater4
+        video_path, en_srt_path, zh_srt_path, output_dir, meta_path, config, updater4,
+        words_json_path  # 🆕 传递词级数据路径
     )
     await progress_callback("压制字幕", 100, 0, None, force=True)
-
     await progress_callback("全部完成", 100, 0, None, force=True)
 
     return {

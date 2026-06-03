@@ -6,7 +6,6 @@ import re
 import subprocess
 from pathlib import Path
 from typing import Tuple, List
-
 import pysubs2
 from pysubs2 import Alignment, Color
 
@@ -16,10 +15,12 @@ MAX_LINES = 2
 
 def get_video_info(video_path, ffprobe_path="ffprobe"):
     cmd = [
-        ffprobe_path, "-v", "error",
+        ffprobe_path,
+        "-v", "error",
         "-select_streams", "v:0",
         "-show_entries", "stream=height:format=duration",
-        "-of", "json", str(video_path)
+        "-of", "json",
+        str(video_path)
     ]
     try:
         res = subprocess.run(cmd, capture_output=True, text=True)
@@ -51,12 +52,10 @@ def calculate_font_size(video_height: int, font_cfg: dict) -> Tuple[int, int]:
     scale = font_cfg.get("scale", 1.2)
     base_zh = int(video_height * 0.050 * scale)
     base_en = int(video_height * 0.035 * scale)
-
     max_zh_ratio = font_cfg.get("max_font_size_zh_ratio", 0.08)
     max_en_ratio = font_cfg.get("max_font_size_en_ratio", 0.055)
     min_zh = font_cfg.get("min_font_size_zh", 28)
     min_en = font_cfg.get("min_font_size_en", 20)
-
     zh_size = max(min_zh, min(base_zh, int(video_height * max_zh_ratio)))
     en_size = max(min_en, min(base_en, int(video_height * max_en_ratio)))
     return zh_size, en_size
@@ -74,7 +73,8 @@ def calculate_max_chars_per_line(video_height: int, font_size: int, is_chinese: 
         return max(50, min(max_chars, 120))
 
 
-def split_text_into_lines(text: str, max_chars: int, is_chinese: bool = True, max_lines: int = MAX_LINES) -> List[str]:
+def split_text_into_lines(text: str, max_chars: int, is_chinese: bool = True,
+                          max_lines: int = MAX_LINES) -> List[str]:
     """智能分割，强制限制最多 max_lines 行，超长句截断"""
     text = text.strip()
     if len(text) <= max_chars:
@@ -141,13 +141,16 @@ def split_text_into_lines(text: str, max_chars: int, is_chinese: bool = True, ma
                 current += word + " "
         if current.strip() and len(lines) < max_lines:
             lines.append(current.strip())
+
     return lines
 
 
-def create_adaptive_ass(zh_srt: str, en_srt: str, video_height: int, output_ass: str, config=None) -> bool:
+def create_adaptive_ass(zh_srt: str, en_srt: str, video_height: int,
+                        output_ass: str, config=None) -> bool:
     """创建自适应 ASS 字幕，严格执行 2 行上限"""
     if config is None:
         config = {}
+
     font_cfg = config.get("font", {})
     font_zh = font_cfg.get("zh", "Microsoft YaHei")
     font_en = font_cfg.get("en", "Arial")
@@ -191,33 +194,20 @@ def create_adaptive_ass(zh_srt: str, en_srt: str, video_height: int, output_ass:
     en_margin_v = int(zh_margin_v + zh_size * 1.4)
 
     style_zh = pysubs2.SSAStyle(
-        fontname=font_zh,
-        fontsize=zh_size,
-        primarycolor=zh_color,
-        outlinecolor=Color(0, 0, 0),
+        fontname=font_zh, fontsize=zh_size,
+        primarycolor=zh_color, outlinecolor=Color(0, 0, 0),
         backcolor=Color(0, 0, 0, 0),
-        bold=True,
-        outline=zh_outline,
-        shadow=shadow,
+        bold=True, outline=zh_outline, shadow=shadow,
         alignment=Alignment.BOTTOM_CENTER,
-        marginl=10, marginr=10,
-        marginv=zh_margin_v,
-        borderstyle=1
+        marginl=10, marginr=10, marginv=zh_margin_v, borderstyle=1
     )
-
     style_en = pysubs2.SSAStyle(
-        fontname=font_en,
-        fontsize=en_size,
-        primarycolor=en_color,
-        outlinecolor=Color(0, 0, 0),
+        fontname=font_en, fontsize=en_size,
+        primarycolor=en_color, outlinecolor=Color(0, 0, 0),
         backcolor=Color(0, 0, 0, 0),
-        bold=False,
-        outline=en_outline,
-        shadow=shadow,
+        bold=False, outline=en_outline, shadow=shadow,
         alignment=Alignment.BOTTOM_CENTER,
-        marginl=10, marginr=10,
-        marginv=en_margin_v,
-        borderstyle=1
+        marginl=10, marginr=10, marginv=en_margin_v, borderstyle=1
     )
 
     merged.styles["ChineseMain"] = style_zh
@@ -242,20 +232,24 @@ def time_str_to_seconds(time_str):
 
 
 def burn_video_with_progress(video_in, ass_in, logo_in, video_out, total_duration,
-                           ffmpeg_path, preview_mode=False, preview_duration=30, progress_callback=None):
+                             ffmpeg_path, preview_mode=False, preview_duration=30,
+                             progress_callback=None):
     print("\n🚀 开始压制...")
     ass_path_clean = str(Path(ass_in).as_posix()).replace(":", "\:")
+
     cmd = [ffmpeg_path, "-y", "-v", "error", "-stats"]
     if preview_mode:
         cmd.extend(["-t", str(preview_duration)])
+
     cmd.extend([
-        "-i", video_in, "-i", logo_in,
+        "-i", video_in,
+        "-i", logo_in,
         "-filter_complex",
         f"[1:v]scale=iw*0.15:-1[logo];[0:v][logo]overlay=main_w-overlay_w-20:20,ass='{ass_path_clean}'",
         "-c:v", "libx264", "-preset", "medium", "-crf", "20",
         "-profile:v", "high", "-level", "4.1", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k",
-        "-movflags", "+faststart", video_out
+        "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
+        video_out
     ])
 
     progress_duration = preview_duration if preview_mode else total_duration
@@ -267,9 +261,7 @@ def burn_video_with_progress(video_in, ass_in, logo_in, video_out, total_duratio
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
     process = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, encoding='utf-8', errors='replace',
         startupinfo=startupinfo
     )
@@ -280,6 +272,7 @@ def burn_video_with_progress(video_in, ass_in, logo_in, video_out, total_duratio
 
     time_pattern = re.compile(r"time=(\d{2}:\d{2}:\d{2}\.\d+)")
     last_percent = -1
+
     while True:
         line = process.stdout.readline()
         if not line and process.poll() is not None:
@@ -295,12 +288,13 @@ def burn_video_with_progress(video_in, ass_in, logo_in, video_out, total_duratio
                         elapsed = time.time() - start_time
                         eta = (progress_duration - current_seconds) * (elapsed / current_seconds) if current_seconds > 0 else 0
                         progress_callback(percent, eta)
-                bar_len = 30
-                filled = int(bar_len * current_seconds // progress_duration)
-                bar = '█' * filled + '-' * (bar_len - filled)
-                sys.stdout.write(f"\r[{bar}] {percent:.1f}%")
-                sys.stdout.flush()
+                    bar_len = 30
+                    filled = int(bar_len * current_seconds // progress_duration)
+                    bar = '█' * filled + '-' * (bar_len - filled)
+                    sys.stdout.write(f"\r[{bar}] {percent:.1f}%")
+                    sys.stdout.flush()
     print()
+
     if process.returncode == 0:
         print(f"✅ 压制完成！耗时 {int(time.time() - start_time)} 秒")
         return True
@@ -308,8 +302,10 @@ def burn_video_with_progress(video_in, ass_in, logo_in, video_out, total_duratio
         print("❌ 压制失败")
         return False
 
+
 def burn_subtitles(video_path, en_srt_path, zh_srt_path, output_dir=None,
-                   meta_path=None, config=None, progress_callback=None):
+                   meta_path=None, config=None, progress_callback=None,
+                   words_json_path=None):  # 🆕 新增参数，预留词级数据
     if output_dir is None:
         output_dir = video_path.parent / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -329,13 +325,15 @@ def burn_subtitles(video_path, en_srt_path, zh_srt_path, output_dir=None,
     safe_base_name = config.get("safe_base_name", video_path.stem)
     out_video = output_dir / f"{safe_base_name}_subtitled.mp4"
 
-    success = burn_video_with_progress(str(video_path), str(ass_path), logo_path, str(out_video),
-                                       duration, ffmpeg_path, False, 30, progress_callback)
+    success = burn_video_with_progress(
+        str(video_path), str(ass_path), logo_path, str(out_video),
+        duration, ffmpeg_path, False, 30, progress_callback
+    )
 
     if ass_path.exists():
         try:
             os.remove(ass_path)
-            print("🗑️  已清理临时 ASS")
+            print("🗑️ 已清理临时 ASS")
         except:
             pass
 

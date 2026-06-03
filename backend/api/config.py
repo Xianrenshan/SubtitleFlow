@@ -5,6 +5,7 @@ from backend.config import config_manager
 
 router = APIRouter()
 
+
 # 和 config.json 的结构对齐，使用嵌套模型
 class FeaturesConfig(BaseModel):
     enable_asr_prompt: bool = True
@@ -12,6 +13,7 @@ class FeaturesConfig(BaseModel):
     enable_summary: bool = False
     enable_titles: bool = False
     enable_tags: bool = False
+
 
 class OllamaModelConfig(BaseModel):
     model: str
@@ -21,10 +23,12 @@ class OllamaModelConfig(BaseModel):
     max_tokens: Optional[int] = None
     concurrency: Optional[int] = None
 
+
 class OllamaConfig(BaseModel):
     translate: OllamaModelConfig
     analysis: OllamaModelConfig
     prompt_generation: OllamaModelConfig
+
 
 class WhisperConfig(BaseModel):
     model_dir: str
@@ -32,6 +36,7 @@ class WhisperConfig(BaseModel):
     compute_type: str = "int8"
     beam_size: int = 5
     language: str = "en"
+
 
 class FontConfig(BaseModel):
     zh: str = "Microsoft YaHei"
@@ -47,13 +52,16 @@ class FontConfig(BaseModel):
     max_font_size_zh_ratio: float = 0.06
     max_font_size_en_ratio: float = 0.045
 
+
 class FfmpegConfig(BaseModel):
     executable: str
     ffprobe: str
 
+
 class LocalTranslationConfig(BaseModel):
     model_dir: str = ""
     topic: str = ""
+
 
 class OnlineApiConfig(BaseModel):
     base_url: str = ""
@@ -63,9 +71,15 @@ class OnlineApiConfig(BaseModel):
     max_tokens: int = 512
     system_prompt: str = "你是一个专业的字幕翻译助手。请将用户提供的英文逐句翻译成中文，只输出译文，不要解释，不要添加额外内容。"
     batch_mode: bool = False
-    batch_size: int = 5
+    batch_size: int = 8          # 🆕 默认 8（原 5）
     request_delay: float = 0.5
-    enable_thinking: Optional[bool] = None   # ← 新增
+    enable_thinking: Optional[bool] = None
+    time_window: float = 25.0    # 🆕 新增：翻译时间窗口（秒）
+
+
+class SubtitleConfig(BaseModel):
+    max_clause_chars: int = 50   # 🆕 新增：子句拆分最大字符数
+
 
 class ConfigUpdate(BaseModel):
     features: Optional[FeaturesConfig] = None
@@ -76,10 +90,13 @@ class ConfigUpdate(BaseModel):
     translate_backend: Optional[str] = "ollama"
     local_translation: Optional[LocalTranslationConfig] = None
     online_api: Optional[OnlineApiConfig] = None
+    subtitle: Optional[SubtitleConfig] = None  # 🆕 新增
+
 
 @router.get("/config")
 async def get_config():
     return config_manager.get_all()
+
 
 @router.post("/config")
 async def update_config(update: ConfigUpdate):
