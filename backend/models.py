@@ -1,16 +1,19 @@
 from datetime import datetime
 from enum import Enum
+
 from pydantic import BaseModel
 from sqlalchemy import Column, String, Integer, DateTime, Float, JSON
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
+
 class TaskStatus(str, Enum):
     PENDING = "pending"
     PROCESSING = "processing"
     SUCCESS = "success"
     FAILED = "failed"
+
 
 class TaskDB(Base):
     __tablename__ = "tasks"
@@ -33,6 +36,8 @@ class TaskDB(Base):
     eta_sec = Column(Float, nullable=True)
     step_started_at = Column(DateTime, nullable=True)
     original_filename = Column(String, nullable=True)
+    file_size = Column(Integer, nullable=True)  # 🆕 文件大小（字节）
+
 
 class TaskResponse(BaseModel):
     task_id: str
@@ -50,13 +55,13 @@ class TaskResponse(BaseModel):
         from_attributes = True
 
 
-# ==================== 新增：裁剪记录模型 ====================
+# ==================== 裁剪记录模型 ====================
+
 class CropRecord(Base):
     __tablename__ = "crops"
-
     crop_id = Column(String, primary_key=True)
     task_id = Column(String, nullable=False, index=True)
-    segments = Column(JSON, nullable=False)          # [{"start":"00:01:00","end":"00:02:00"},...]
+    segments = Column(JSON, nullable=False)  # [{"start":"00:01:00","end":"00:02:00"},...]
     status = Column(String, default="processing")
     output_path = Column(String, nullable=True)
     error_message = Column(String, nullable=True)

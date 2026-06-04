@@ -2,10 +2,12 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 import shutil
 from pathlib import Path
+
 from backend.database import get_all_tasks, delete_task_by_id, delete_tasks_by_ids, get_task
 from backend.config import backend_config
 
 router = APIRouter()
+
 
 def _delete_task_files(task):
     """删除 uploads 中的源视频和 output/任务ID 整个目录"""
@@ -13,11 +15,11 @@ def _delete_task_files(task):
     input_path = Path(task.input_video_path) if task.input_video_path else None
     if input_path and input_path.exists():
         input_path.unlink(missing_ok=True)
-
     # 删除整个 output 子目录
     output_dir = backend_config.OUTPUT_DIR / task.task_id
     if output_dir.exists():
         shutil.rmtree(output_dir, ignore_errors=True)
+
 
 @router.get("/tasks")
 async def list_tasks(
@@ -36,19 +38,21 @@ async def list_tasks(
                 "status": t.status,
                 "progress": t.progress,
                 "current_step": t.current_step,
-                # 🔧 修复：加上 'Z' 标记 UTC，前端 new Date() 会自动转本地时区
-                "created_at": t.created_at.isoformat() + 'Z' if t.created_at else None,
-                "updated_at": t.updated_at.isoformat() + 'Z' if t.updated_at else None,
+                # 🔧 修复：不再手动加 'Z'，由前端统一标记 UTC
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+                "updated_at": t.updated_at.isoformat() if t.updated_at else None,
                 "error_message": t.error_message,
                 "output_video_path": t.output_video_path,
                 "output_zh_srt": t.output_zh_srt,
                 "output_en_srt": t.output_en_srt,
                 "output_meta": t.output_meta,
                 "original_filename": t.original_filename,
+                "file_size": t.file_size,  # 🆕 返回文件大小
             }
             for t in tasks
         ]
     }
+
 
 @router.delete("/tasks/{task_id}")
 async def delete_single_task(task_id: str):
@@ -59,6 +63,7 @@ async def delete_single_task(task_id: str):
     await delete_task_by_id(task_id)
     return {"status": "ok"}
 
+
 @router.post("/tasks/batch-delete")
 async def batch_delete(task_ids: List[str]):
     for tid in task_ids:
@@ -67,6 +72,7 @@ async def batch_delete(task_ids: List[str]):
             _delete_task_files(task)
     await delete_tasks_by_ids(task_ids)
     return {"deleted": len(task_ids)}
+
 
 @router.post("/tasks/cleanup")
 async def cleanup_completed():

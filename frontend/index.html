@@ -658,9 +658,8 @@
             </div>
             <div class="card-meta">
               <span>📅 {{ formatDate(item.created_at) }}</span>
-              <span v-if="item.original_filename">📦 未知大小</span>
+              <span v-if="item.file_size">📦 {{ formatFileSize(item.file_size) }}</span>
             </div>
-            
             <div class="card-actions">
               <template v-if="item.status === 'success'">
                 <el-button size="small" @click="downloadHistoryFile(item.task_id, 'video')" v-if="item.output_video_path">🎬 原版</el-button>
@@ -1018,13 +1017,20 @@
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
       };
 
+      // ✅ 修复后（自动检测时区，不会重复加Z）
       const formatDate = (dateStr) => {
-        if (!dateStr) return '-';
-        const date = new Date(dateStr + 'Z');
-        return date.toLocaleString('zh-CN', { 
-          year: 'numeric', month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit', second: '2-digit'
-        });
+          if (!dateStr) return '-';
+          // 自动检测：如果已经有Z或者时区偏移（如+08:00），就直接用；没有才加Z
+          const normalized = dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr)
+              ? dateStr 
+              : dateStr + 'Z';
+          const date = new Date(normalized);
+          // 额外防御：如果解析失败，返回'-'而不是Invalid Date
+          if (isNaN(date.getTime())) return '-';
+          return date.toLocaleString('zh-CN', { 
+              year: 'numeric', month: '2-digit', day: '2-digit',
+              hour: '2-digit', minute: '2-digit', second: '2-digit'
+          });
       };
 
       const resetMain = () => {
