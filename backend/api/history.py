@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 import shutil
 from pathlib import Path
-
 from backend.database import get_all_tasks, delete_task_by_id, delete_tasks_by_ids, get_task
 from backend.config import backend_config
 
@@ -15,6 +14,7 @@ def _delete_task_files(task):
     input_path = Path(task.input_video_path) if task.input_video_path else None
     if input_path and input_path.exists():
         input_path.unlink(missing_ok=True)
+
     # 删除整个 output 子目录
     output_dir = backend_config.OUTPUT_DIR / task.task_id
     if output_dir.exists():
@@ -38,7 +38,6 @@ async def list_tasks(
                 "status": t.status,
                 "progress": t.progress,
                 "current_step": t.current_step,
-                # 🔧 修复：不再手动加 'Z'，由前端统一标记 UTC
                 "created_at": t.created_at.isoformat() if t.created_at else None,
                 "updated_at": t.updated_at.isoformat() if t.updated_at else None,
                 "error_message": t.error_message,
@@ -47,7 +46,7 @@ async def list_tasks(
                 "output_en_srt": t.output_en_srt,
                 "output_meta": t.output_meta,
                 "original_filename": t.original_filename,
-                "file_size": t.file_size,  # 🆕 返回文件大小
+                "file_size": t.file_size,
             }
             for t in tasks
         ]
@@ -83,3 +82,24 @@ async def cleanup_completed():
         _delete_task_files(t)
     await delete_tasks_by_ids(ids)
     return {"deleted": len(ids)}
+
+
+# ==================== 新增：重新制作 ====================
+
+@router.post("/tasks/{task_id}/reprocess")
+async def reprocess_task(task_id: str):
+    """重新制作：复用同一 task_id，用最新配置重新跑流水线"""
+    task = await get_task(task_id)
+    if not task:
+        raise HTTPException(404, "任务不存在")
+    if task.status == "processing":
+        raise HTTPException(400, "任务正在处理中，无法重新制作")
+    if not task.input_video_path or not Path(task.input_video_path).exists():
+        raise HTTPException(404, "源视频文件已被清理，无法重新制作")
+
+    # 启动流水线（start_pipeline 内部会重置状态、读取最新配置）
+    import asyncio
+    from backend.tasks import start_pipeline
+    asyncio.create_task(start_pipeline(task_id, Path(task.input_video_path)))
+
+    return {"task_id": task_id, "status": "processing"}

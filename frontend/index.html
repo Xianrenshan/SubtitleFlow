@@ -668,6 +668,12 @@
                 <el-button size="small" @click="downloadHistoryFile(item.task_id, 'meta')" v-if="item.output_meta">📄 元数据</el-button>
                 <el-button size="small" type="primary" plain @click="openCropDialog(item.task_id)">✂️ 裁剪</el-button>
               </template>
+              <!-- ✅ 新增：重新制作按钮 -->
+              <el-button size="small" type="warning" plain
+                  @click="reprocessTask(item.task_id)"
+                  v-if="item.status === 'success' || item.status === 'failed'">
+                  🔄 重新制作
+              </el-button>
               <el-button size="small" type="danger" @click="deleteTask(item.task_id)">🗑 删除</el-button>
               
               <!-- 展开裁剪列表开关 -->
@@ -1133,6 +1139,37 @@
         window.open(`/api/download/crop/${cropId}`, '_blank');
       };
 
+      // ✅ 新增：重新制作方法
+      const reprocessTask = async (taskId) => {
+        try {
+          const res = await fetch(`/api/tasks/${taskId}/reprocess`, { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || '重新制作失败');
+          // 重置步骤指示器
+          steps.forEach(s => {
+            s.active = false;
+            s.completed = false;
+          });
+          // 设置当前任务，切换到处理中心
+          task.value = {
+            task_id: taskId,
+            status: 'processing',
+            step_progress: 0,
+            current_step: '准备开始'
+          };
+          elapsedSec.value = 0;
+          etaSec.value = null;
+          selectedFile.value = null;
+          fileList.value = [];
+          activeTab.value = 'main';
+          // 开始轮询
+          startPolling(taskId);
+          ElementPlus.ElMessage.success('已开始重新制作');
+        } catch (e) {
+          ElementPlus.ElMessage.error('重新制作失败: ' + e.message);
+        }
+      };
+
       // ========== 裁剪弹窗 ==========
       const cropDialogVisible = ref(false);
       const currentCropTaskId = ref('');
@@ -1325,9 +1362,9 @@
         onFileChange, uploadVideo, resetMain, formatTime, formatFileSize,
         
         // 历史记录
-        historyFilter, filteredHistoryTasks,
-        fetchHistory, deleteTask, cleanupCompleted, downloadHistoryFile,
-        toggleCrops, downloadCropFile,
+        historyFilter, filteredHistoryTasks, fetchHistory, deleteTask, cleanupCompleted,
+        downloadHistoryFile, toggleCrops, downloadCropFile,
+        reprocessTask,  // ← 新增导出
         
         // 裁剪弹窗相关
         cropDialogVisible, currentCropTaskId, cropSegments, cropSubmitting, cropMode,
