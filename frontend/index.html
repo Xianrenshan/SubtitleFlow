@@ -6,141 +6,157 @@
   <title>199 视频处理中枢</title>
   <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
   <style>
-    :root {
-      --bg-primary: #0b0f19;
-      --bg-secondary: #1a1f2e;
-      --glass-bg: rgba(22, 27, 40, 0.7);
-      --glass-border: rgba(255, 255, 255, 0.08);
-      --text-primary: #e2e8f0;
-      --text-secondary: #94a3b8;
-      --accent-cyan: #06b6d4;
-      --accent-blue: #3b82f6;
-      --success: #10b981;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --radius-lg: 16px;
-      --radius-md: 12px;
-      --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.4);
-      --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-      background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-      color: var(--text-primary); min-height: 100vh; -webkit-font-smoothing: antialiased;
-    }
-    #app { max-width: 1200px; margin: 0 auto; padding: 24px; }
-    .app-header { text-align: center; margin-bottom: 32px; }
-    .app-header h1 {
-      font-size: 28px; font-weight: 700;
-      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 8px;
-    }
-    .app-header p { color: var(--text-secondary); font-size: 14px; }
-    .el-tabs { background: transparent; border: none; }
-    .el-tabs__header {
-      margin-bottom: 20px; background: var(--glass-bg); backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px); border-radius: var(--radius-md); border: 1px solid var(--glass-border); padding: 6px 12px;
-    }
-    .el-tabs__nav { border: none; }
-    .el-tabs__item {
-      color: var(--text-secondary) !important; border-radius: 8px; transition: all 0.3s;
-      height: 38px; line-height: 38px; margin: 0 4px; padding: 0 20px;
-    }
-    .el-tabs__item.is-active { color: var(--accent-cyan) !important; background: rgba(6, 182, 212, 0.1); }
-    .el-tabs__active-bar { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue)); height: 2px; border-radius: 2px; }
-    .glass-card {
-      background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-glass); padding: 24px; margin-bottom: 20px;
-    }
-    .upload-zone {
-      border: 2px dashed var(--glass-border); border-radius: var(--radius-lg); padding: 40px; text-align: center; transition: all 0.3s; cursor: pointer; background: rgba(255,255,255,0.02);
-    }
-    .upload-zone:hover { border-color: var(--accent-cyan); background: rgba(6, 182, 212, 0.05); box-shadow: 0 0 20px rgba(6, 182, 212, 0.15); }
-    .upload-zone .el-upload-dragger { background: transparent; border: none; width: 100%; }
-    .upload-file-info { margin-top: 16px; color: var(--text-secondary); font-size: 14px; }
-    .action-btn {
-      width: 100%; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue)); border: none;
-      font-weight: 600; font-size: 16px; height: 48px; border-radius: 10px; transition: all 0.3s;
-      box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3); letter-spacing: 0.5px;
-    }
-    .action-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(6, 182, 212, 0.5); }
-    .action-btn.is-disabled { background: var(--glass-border); box-shadow: none; }
-    .step-timeline { display: flex; justify-content: space-between; margin: 30px 0; }
-    .step-item { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; color: var(--text-secondary); transition: color 0.3s; }
-    .step-item.active { color: var(--accent-cyan); }
-    .step-item.completed { color: var(--success); }
-    .step-circle {
-      width: 40px; height: 40px; border-radius: 50%; background: var(--glass-bg); border: 2px solid var(--glass-border);
-      display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; position: relative; z-index: 2; transition: all 0.3s;
-    }
-    .step-item.active .step-circle { border-color: var(--accent-cyan); box-shadow: 0 0 15px rgba(6, 182, 212, 0.5); animation: pulse 2s infinite; }
-    .step-item.completed .step-circle { background: var(--success); border-color: var(--success); color: #fff; }
-    .step-label { margin-top: 8px; font-size: 13px; text-align: center; }
-    .step-line { position: absolute; top: 20px; left: 50%; right: -50%; height: 2px; background: var(--glass-border); z-index: 1; }
-    .step-item.completed .step-line { background: var(--success); }
-    .step-item:last-child .step-line { display: none; }
-    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.6); } 70% { box-shadow: 0 0 0 10px rgba(6, 182, 212, 0); } 100% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0); } }
-    .dashboard { display: flex; flex-direction: column; align-items: center; padding: 20px 0; }
-    .progress-ring { position: relative; width: 200px; height: 200px; }
-    .progress-ring .el-progress { width: 200px !important; height: 200px !important; }
-    .progress-ring .el-progress__text { display: flex !important; align-items: center !important; justify-content: center !important; width: 100% !important; height: 100% !important; top: 0 !important; left: 0 !important; transform: none !important; margin: 0 !important; }
-    .progress-center { text-align: center; line-height: 1.3; }
-    .progress-percent { font-size: 2.5rem; font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); }
-    .progress-step-name { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
-    .time-cards { display: flex; gap: 20px; margin-top: 24px; }
-    .time-card { background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 10px; padding: 16px 24px; text-align: center; min-width: 120px; }
-    .time-card .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
-    .time-card .value { font-family: var(--font-mono); font-size: 1.4rem; font-weight: 600; }
-    .success-card { border-color: var(--success); box-shadow: 0 0 30px rgba(16, 185, 129, 0.2); }
-    .download-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-top: 20px; }
-    .download-item {
-      background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 20px;
-      text-align: center; cursor: pointer; transition: all 0.3s; color: var(--text-primary); text-decoration: none; display: flex; flex-direction: column; align-items: center; gap: 8px;
-    }
-    .download-item:hover { border-color: var(--accent-cyan); background: rgba(6, 182, 212, 0.1); }
-    .error-card { border-color: var(--danger); box-shadow: 0 0 30px rgba(239, 68, 68, 0.2); }
-    .error-message { font-family: var(--font-mono); font-size: 13px; background: rgba(239, 68, 68, 0.1); padding: 16px; border-radius: 8px; margin: 16px 0; white-space: pre-wrap; word-break: break-word; }
-    .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; margin-top: 20px; }
-    .history-card {
-      background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 20px; transition: all 0.3s;
-    }
-    .history-card:hover { border-color: var(--accent-cyan); }
-    .history-card .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-    .history-card .card-filename { font-weight: 600; font-size: 15px; word-break: break-word; padding-right: 20px; line-height: 1.4; }
-    .history-card .card-status { flex-shrink: 0; margin-left: 10px; }
-    .history-card .card-meta { display: flex; flex-wrap: wrap; gap: 10px; color: var(--text-secondary); font-size: 13px; margin-bottom: 14px; }
-    .history-card .card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .history-card .card-actions .el-button { font-size: 12px; margin-left: 0; }
-    .crop-list { margin-top: 15px; padding-top: 10px; border-top: 1px dashed var(--glass-border); display: flex; flex-direction: column; gap: 10px; }
-    .crop-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0, 0, 0, 0.2); padding: 8px 12px; border-radius: 6px; font-size: 13px; }
-    .crop-info { display: flex; align-items: center; gap: 10px; }
-    .el-overlay .el-dialog { background: var(--bg-secondary) !important; border: 1px solid var(--glass-border); box-shadow: var(--shadow-glass); }
-    .el-dialog__title { color: var(--text-primary) !important; }
-    .el-dialog__body { color: var(--text-primary) !important; }
-    .el-dialog .el-input__wrapper { background: rgba(255,255,255,0.05) !important; box-shadow: none !important; border: 1px solid var(--glass-border) !important; }
-    .el-dialog .el-input__wrapper:hover, .el-dialog .el-input__wrapper.is-focus { border-color: var(--accent-cyan) !important; }
-    .el-dialog .el-input__inner { color: var(--text-primary) !important; }
-    .config-cards { display: flex; flex-direction: column; gap: 20px; }
-    .config-card {
-      background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 24px; box-shadow: var(--shadow-glass);
-    }
-    .config-card h3 { font-size: 18px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-    .config-card .el-divider { display: none; }
-    .config-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-    .config-row .desc { font-size: 13px; color: var(--text-secondary); margin-left: 10px; flex: 1; }
-    .config-row .el-form-item { margin-bottom: 0; }
-    .el-input__wrapper { background: rgba(255,255,255,0.05); border-color: var(--glass-border); box-shadow: none; }
-    .el-input__wrapper:hover, .el-input__wrapper.is-focus { border-color: var(--accent-cyan); box-shadow: 0 0 5px rgba(6, 182, 212, 0.2); }
-    .el-select .el-input__wrapper { background: rgba(255,255,255,0.05); }
-    @media (max-width: 768px) {
-      .time-cards { flex-direction: column; }
-      .history-grid { grid-template-columns: 1fr; }
-      .step-timeline { flex-direction: column; gap: 10px; }
-      .step-line { display: none; }
-    }
+:root {
+  --bg-primary: #0b0f19;
+  --bg-secondary: #1a1f2e;
+  --glass-bg: rgba(22, 27, 40, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --accent-cyan: #06b6d4;
+  --accent-blue: #3b82f6;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+#app { max-width: 1200px; margin: 0 auto; padding: 24px; }
+.app-header { text-align: center; margin-bottom: 32px; }
+.app-header h1 {
+  font-size: 28px; font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  margin-bottom: 8px;
+}
+.app-header p { color: var(--text-secondary); font-size: 14px; }
+.el-tabs { background: transparent; border: none; }
+.el-tabs__header {
+  margin-bottom: 20px; background: var(--glass-bg); backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px); border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border); padding: 6px 12px;
+}
+.el-tabs__nav { border: none; }
+.el-tabs__item {
+  color: var(--text-secondary) !important; border-radius: 8px; transition: all 0.3s;
+  height: 38px; line-height: 38px; margin: 0 4px; padding: 0 20px;
+}
+.el-tabs__item.is-active { color: var(--accent-cyan) !important; background: rgba(6, 182, 212, 0.1); }
+.el-tabs__active-bar { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue)); height: 2px; border-radius: 2px; }
+.glass-card {
+  background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-glass); padding: 24px; margin-bottom: 20px;
+}
+.upload-zone {
+  border: 2px dashed var(--glass-border); border-radius: var(--radius-lg);
+  padding: 40px; text-align: center; transition: all 0.3s; cursor: pointer;
+  background: rgba(255,255,255,0.02);
+}
+.upload-zone:hover { border-color: var(--accent-cyan); background: rgba(6, 182, 212, 0.05); box-shadow: 0 0 20px rgba(6, 182, 212, 0.15); }
+.upload-zone .el-upload-dragger { background: transparent; border: none; width: 100%; }
+.upload-file-info { margin-top: 16px; color: var(--text-secondary); font-size: 14px; }
+.action-btn {
+  width: 100%; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+  border: none; font-weight: 600; font-size: 16px; height: 48px; border-radius: 10px;
+  transition: all 0.3s; box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3); letter-spacing: 0.5px;
+}
+.action-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(6, 182, 212, 0.5); }
+.action-btn.is-disabled { background: var(--glass-border); box-shadow: none; }
+.step-timeline { display: flex; justify-content: space-between; margin: 30px 0; }
+.step-item { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; color: var(--text-secondary); transition: color 0.3s; }
+.step-item.active { color: var(--accent-cyan); }
+.step-item.completed { color: var(--success); }
+.step-circle {
+  width: 40px; height: 40px; border-radius: 50%; background: var(--glass-bg);
+  border: 2px solid var(--glass-border); display: flex; align-items: center; justify-content: center;
+  font-weight: bold; font-size: 16px; position: relative; z-index: 2; transition: all 0.3s;
+}
+.step-item.active .step-circle { border-color: var(--accent-cyan); box-shadow: 0 0 15px rgba(6, 182, 212, 0.5); animation: pulse 2s infinite; }
+.step-item.completed .step-circle { background: var(--success); border-color: var(--success); color: #fff; }
+.step-label { margin-top: 8px; font-size: 13px; text-align: center; }
+.step-line { position: absolute; top: 20px; left: 50%; right: -50%; height: 2px; background: var(--glass-border); z-index: 1; }
+.step-item.completed .step-line { background: var(--success); }
+.step-item:last-child .step-line { display: none; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.6); } 70% { box-shadow: 0 0 0 10px rgba(6, 182, 212, 0); } 100% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0); } }
+.dashboard { display: flex; flex-direction: column; align-items: center; padding: 20px 0; }
+.progress-ring { position: relative; width: 200px; height: 200px; }
+.progress-ring .el-progress { width: 200px !important; height: 200px !important; }
+.progress-ring .el-progress__text { display: flex !important; align-items: center !important; justify-content: center !important; width: 100% !important; height: 100% !important; top: 0 !important; left: 0 !important; transform: none !important; margin: 0 !important; }
+.progress-center { text-align: center; line-height: 1.3; }
+.progress-percent { font-size: 2.5rem; font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); }
+.progress-step-name { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+.time-cards { display: flex; gap: 20px; margin-top: 24px; }
+.time-card { background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 10px; padding: 16px 24px; text-align: center; min-width: 120px; }
+.time-card .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+.time-card .value { font-family: var(--font-mono); font-size: 1.4rem; font-weight: 600; }
+.success-card { border-color: var(--success); box-shadow: 0 0 30px rgba(16, 185, 129, 0.2); }
+.download-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-top: 20px; }
+.download-item {
+  background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md);
+  padding: 20px; text-align: center; cursor: pointer; transition: all 0.3s;
+  color: var(--text-primary); text-decoration: none; display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.download-item:hover { border-color: var(--accent-cyan); background: rgba(6, 182, 212, 0.1); }
+.error-card { border-color: var(--danger); box-shadow: 0 0 30px rgba(239, 68, 68, 0.2); }
+.error-message { font-family: var(--font-mono); font-size: 13px; background: rgba(239, 68, 68, 0.1); padding: 16px; border-radius: 8px; margin: 16px 0; white-space: pre-wrap; word-break: break-word; }
+.history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; margin-top: 20px; }
+.history-card {
+  background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 20px; transition: all 0.3s;
+}
+.history-card:hover { border-color: var(--accent-cyan); }
+.history-card .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.history-card .card-filename { font-weight: 600; font-size: 15px; word-break: break-word; padding-right: 20px; line-height: 1.4; }
+.history-card .card-status { flex-shrink: 0; margin-left: 10px; }
+.history-card .card-meta { display: flex; flex-wrap: wrap; gap: 10px; color: var(--text-secondary); font-size: 13px; margin-bottom: 14px; }
+.history-card .card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.history-card .card-actions .el-button { font-size: 12px; margin-left: 0; }
+.crop-list { margin-top: 15px; padding-top: 10px; border-top: 1px dashed var(--glass-border); display: flex; flex-direction: column; gap: 10px; }
+.crop-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0, 0, 0, 0.2); padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+.crop-info { display: flex; align-items: center; gap: 10px; }
+.el-overlay .el-dialog { background: var(--bg-secondary) !important; border: 1px solid var(--glass-border); box-shadow: var(--shadow-glass); }
+.el-dialog__title { color: var(--text-primary) !important; }
+.el-dialog__body { color: var(--text-primary) !important; }
+.el-dialog .el-input__wrapper { background: rgba(255,255,255,0.05) !important; box-shadow: none !important; border: 1px solid var(--glass-border) !important; }
+.el-dialog .el-input__wrapper:hover, .el-dialog .el-input__wrapper.is-focus { border-color: var(--accent-cyan) !important; }
+.el-dialog .el-input__inner { color: var(--text-primary) !important; }
+.config-cards { display: flex; flex-direction: column; gap: 20px; }
+.config-card {
+  background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 24px; box-shadow: var(--shadow-glass);
+}
+.config-card h3 { font-size: 18px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.config-card .el-divider { display: none; }
+.config-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.config-row .desc { font-size: 13px; color: var(--text-secondary); margin-left: 10px; flex: 1; }
+.config-row .el-form-item { margin-bottom: 0; }
+.el-input__wrapper { background: rgba(255,255,255,0.05); border-color: var(--glass-border); box-shadow: none; }
+.el-input__wrapper:hover, .el-input__wrapper.is-focus { border-color: var(--accent-cyan); box-shadow: 0 0 5px rgba(6, 182, 212, 0.2); }
+.el-select .el-input__wrapper { background: rgba(255,255,255,0.05); }
+.fallback-card {
+  background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border);
+  padding: 14px; border-radius: 10px; margin-bottom: 12px;
+}
+.fallback-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.upload-progress-bar { margin-top: 16px; }
+.upload-progress-bar .el-progress__text { color: var(--text-secondary) !important; font-size: 12px !important; }
+@media (max-width: 768px) {
+  .time-cards { flex-direction: column; }
+  .history-grid { grid-template-columns: 1fr; }
+  .step-timeline { flex-direction: column; gap: 10px; }
+  .step-line { display: none; }
+}
   </style>
 </head>
 <body>
@@ -149,12 +165,13 @@
     <h1>🎬 199 视频处理中枢</h1>
     <p>AI 驱动的字幕生成 · 翻译 · 压制一站式流水线</p>
   </div>
+
   <el-tabs v-model="activeTab" type="border-card">
     <!-- ==================== 主流程 ==================== -->
     <el-tab-pane label="🚀 处理中心" name="main">
       <div class="glass-card" v-if="!task">
-        <!-- 上传区域 -->
-        <el-upload class="upload-zone" drag :auto-upload="false" :on-change="onFileChange" accept="video/*" :limit="1" v-model:file-list="fileList">
+        <el-upload class="upload-zone" drag :auto-upload="false" :on-change="onFileChange"
+                   accept="video/*" :limit="1" v-model:file-list="fileList">
           <div style="font-size: 48px; margin-bottom: 16px;">📁</div>
           <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">拖拽视频文件到此处</div>
           <div style="font-size: 13px; color: var(--text-secondary);">支持 MP4、WebM、MKV 等格式，或点击选择文件</div>
@@ -162,14 +179,37 @@
         <div class="upload-file-info" v-if="selectedFile">
           ✅ 已选择：{{ selectedFile.name }} ({{ formatFileSize(selectedFile.size) }})
         </div>
+
+        <!-- 分片上传进度 -->
+        <div class="upload-progress-bar" v-if="uploading && uploadChunkProgress.total > 0">
+          <el-progress
+            :percentage="Math.round((uploadChunkProgress.uploaded / uploadChunkProgress.total) * 100)"
+            :stroke-width="8"
+            :format="() => '上传分片 ' + uploadChunkProgress.uploaded + '/' + uploadChunkProgress.total"
+          />
+        </div>
+
         <el-button class="action-btn" :disabled="!selectedFile || uploading" @click="uploadVideo" style="margin-top: 20px;">
           {{ uploading ? '上传中...' : '⚡ 开始处理' }}
         </el-button>
+
+        <!-- 续传提示 -->
+        <div v-if="pendingUploads.length > 0 && !selectedFile && !uploading" style="margin-top: 16px; text-align: center;">
+          <el-alert type="info" :closable="false" style="margin-bottom: 12px;">
+            <template #title>发现 {{ pendingUploads.length }} 个未完成的上传</template>
+          </el-alert>
+          <div v-for="pu in pendingUploads" :key="pu.uploadId" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">
+            📄 {{ pu.fileName }} ({{ formatFileSize(pu.fileSize) }})
+            <el-button type="danger" text size="small" @click="cancelPendingUpload(pu.uploadId)">取消</el-button>
+          </div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">
+            请重新选择相同文件，系统将自动跳过已上传部分
+          </div>
+        </div>
       </div>
 
       <!-- 处理中 / 完成 / 失败 状态 -->
       <div v-if="task" :class="['glass-card', task.status === 'success' ? 'success-card' : '', task.status === 'failed' ? 'error-card' : '']">
-        <!-- 步骤指示器 -->
         <div class="step-timeline" v-if="task.status === 'processing' || task.status === 'pending'">
           <div v-for="(step, idx) in steps" :key="idx" :class="['step-item', { active: step.active, completed: step.completed }]">
             <div class="step-circle">{{ step.completed ? '✓' : idx + 1 }}</div>
@@ -178,7 +218,6 @@
           </div>
         </div>
 
-        <!-- 处理中：仪表盘 -->
         <div v-if="task.status === 'processing' || task.status === 'pending'" class="dashboard">
           <div class="progress-ring">
             <el-progress type="circle" :percentage="Math.round(task.step_progress || 0)" :stroke-width="12" :width="200" color="url(#gradient)">
@@ -210,7 +249,6 @@
           </div>
         </div>
 
-        <!-- 完成状态 -->
         <div v-if="task.status === 'success'">
           <div style="text-align: center; padding: 20px 0;">
             <div style="font-size: 64px;">✅</div>
@@ -218,16 +256,16 @@
             <p style="color: var(--text-secondary);">你的视频已处理完毕，请下载文件</p>
           </div>
           <div class="download-grid">
-            <a :href="`/api/download/${task.task_id}/video`" class="download-item" v-if="task.download_urls?.video">
+            <a :href="'/api/download/' + task.task_id + '/video'" class="download-item" v-if="task.download_urls && task.download_urls.video">
               <span style="font-size: 28px;">🎬</span><span>压制视频</span>
             </a>
-            <a :href="`/api/download/${task.task_id}/zh_srt`" class="download-item" v-if="task.download_urls?.zh_srt">
+            <a :href="'/api/download/' + task.task_id + '/zh_srt'" class="download-item" v-if="task.download_urls && task.download_urls.zh_srt">
               <span style="font-size: 28px;">🇨🇳</span><span>中文字幕</span>
             </a>
-            <a :href="`/api/download/${task.task_id}/en_srt`" class="download-item" v-if="task.download_urls?.en_srt">
+            <a :href="'/api/download/' + task.task_id + '/en_srt'" class="download-item" v-if="task.download_urls && task.download_urls.en_srt">
               <span style="font-size: 28px;">🇬🇧</span><span>英文字幕</span>
             </a>
-            <a :href="`/api/download/${task.task_id}/meta`" class="download-item" v-if="task.download_urls?.meta">
+            <a :href="'/api/download/' + task.task_id + '/meta'" class="download-item" v-if="task.download_urls && task.download_urls.meta">
               <span style="font-size: 28px;">📄</span><span>元数据</span>
             </a>
           </div>
@@ -236,7 +274,6 @@
           </div>
         </div>
 
-        <!-- 失败状态 -->
         <div v-if="task.status === 'failed'">
           <div style="text-align: center; padding: 20px 0;">
             <div style="font-size: 64px;">❌</div>
@@ -268,6 +305,7 @@
             </template>
           </el-popconfirm>
         </div>
+
         <div class="history-grid">
           <div v-for="item in filteredHistoryTasks" :key="item.task_id" class="history-card">
             <div class="card-header">
@@ -312,7 +350,7 @@
                 </div>
                 <div class="crop-action">
                   <el-button v-if="crop.status === 'success'" size="small" type="primary" link @click="downloadCropFile(crop.crop_id)">⬇️ 下载</el-button>
-                  <div v-if="crop.status === 'failed'" style="font-size: 12px; color: var(--danger)" :title="crop.error_message">失败详情</div>
+                  <div v-if="crop.status === 'failed'" style="font-size: 12px; color: var(--danger);" :title="crop.error_message">失败详情</div>
                 </div>
               </div>
             </div>
@@ -358,6 +396,7 @@
             </div>
           </div>
         </div>
+
         <div class="config-card">
           <h3>🧠 模型设置</h3>
           <div class="config-row"><span>分析模型</span><el-input v-model="configForm.ollama.analysis.model" style="width: 200px;" /></div>
@@ -365,6 +404,7 @@
           <div class="config-row"><span>翻译模型</span><el-input v-model="configForm.ollama.translate.model" style="width: 200px;" /></div>
           <div class="config-row"><span>翻译温度</span><el-slider v-model="configForm.ollama.translate.temperature" :min="0" :max="1" :step="0.05" show-input style="width: 200px;" /></div>
         </div>
+
         <div class="config-card">
           <h3>🔧 翻译后端</h3>
           <div class="config-row">
@@ -387,7 +427,32 @@
               </el-select>
             </div>
             <div class="config-row" v-if="configForm.online_api.batch_mode"><span>每批句数</span><el-slider v-model="configForm.online_api.batch_size" :min="1" :max="20" :step="1" show-input style="width: 200px;" /></div>
+
+            <!-- 备用 API 列表 -->
+            <div style="margin-top: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-weight: 600; font-size: 15px;">🔗 备用 API（额度耗尽时自动切换）</span>
+                <el-button type="primary" plain size="small" @click="addFallback">+ 添加备用</el-button>
+              </div>
+              <div v-for="(fb, idx) in (configForm.online_api.fallbacks || [])" :key="idx" class="fallback-card">
+                <div class="fallback-header">
+                  <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">备用 API {{ idx + 1 }}</span>
+                  <el-button type="danger" plain size="small" @click="removeFallback(idx)">移除</el-button>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div class="config-row"><span>名称</span><el-input v-model="fb.name" placeholder="备用1" style="width: 200px;" /></div>
+                  <div class="config-row"><span>API 地址</span><el-input v-model="fb.base_url" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" style="width: 300px;" /></div>
+                  <div class="config-row"><span>API 密钥</span><el-input v-model="fb.api_key" type="password" show-password placeholder="sk-..." style="width: 300px;" /></div>
+                  <div class="config-row"><span>模型名称</span><el-input v-model="fb.model" placeholder="qwen-turbo" style="width: 200px;" /></div>
+                </div>
+              </div>
+              <div v-if="!configForm.online_api.fallbacks || configForm.online_api.fallbacks.length === 0"
+                   style="font-size: 13px; color: var(--text-secondary); text-align: center; padding: 12px;">
+                暂无备用 API，主 API 额度耗尽时任务将失败
+              </div>
+            </div>
           </template>
+
           <div class="config-row" v-if="configForm.translate_backend === 'local_transformers'"><span>模型路径</span><el-input v-model="configForm.local_translation.model_dir" placeholder="E:\modelscope\..." style="width: 300px;" /></div>
           <div class="config-row" v-if="configForm.translate_backend === 'local_transformers'">
             <span>视频主题</span>
@@ -404,20 +469,22 @@
             </div>
           </div>
         </div>
+
         <div class="config-card">
           <h3>🎨 字幕样式</h3>
           <div class="config-row"><span>中文字体</span><el-input v-model="configForm.font.zh" style="width: 200px;" /></div>
           <div class="config-row"><span>英文字体</span><el-input v-model="configForm.font.en" style="width: 200px;" /></div>
           <div class="config-row"><span>字体缩放</span><el-slider v-model="configForm.font.scale" :min="0.8" :max="1.5" :step="0.05" show-input style="width: 200px;" /></div>
         </div>
-        <el-button type="primary" @click="saveConfig" :class="configSaved ? 'success-btn' : ''" size="large" style="align-self: flex-end;">
+
+        <el-button type="primary" @click="saveConfig" size="large" style="align-self: flex-end;">
           {{ configSaved ? '✓ 已保存' : '保存配置' }}
         </el-button>
       </div>
     </el-tab-pane>
   </el-tabs>
 
-  <!-- ==================== ✂️ 裁剪对话框 ==================== -->
+  <!-- 裁剪对话框 -->
   <el-dialog v-model="cropDialogVisible" title="✂️ 视频片段裁剪" width="520px">
     <el-radio-group v-model="cropMode" style="margin-bottom: 16px; display: flex;">
       <el-radio-button label="remove">🗑️ 删除片段（去掉广告）</el-radio-button>
@@ -431,7 +498,8 @@
         请输入你要<strong style="color:var(--accent-cyan)">保留</strong>的视频片段。<br>最终会将所有保留段按照顺序拼接到一起。
       </template>
     </div>
-    <div v-for="(seg, idx) in cropSegments" :key="idx" style="background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); padding: 14px; border-radius: 10px; margin-bottom: 12px;">
+    <div v-for="(seg, idx) in cropSegments" :key="idx"
+         style="background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); padding: 14px; border-radius: 10px; margin-bottom: 12px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">{{ cropMode === 'remove' ? '🗑️ 删除段' : '💾 保留段' }} {{ idx + 1 }}</span>
         <el-button type="danger" plain size="small" @click="removeCropSegment(idx)" :disabled="cropSegments.length <= 1">移除</el-button>
@@ -447,7 +515,9 @@
         </div>
       </div>
     </div>
-    <el-button type="primary" plain size="small" @click="addCropSegment" style="width: 100%; margin-top: 6px; border-style: dashed;">+ 添加{{ cropMode === 'remove' ? '删除' : '保留' }}时间段</el-button>
+    <el-button type="primary" plain size="small" @click="addCropSegment" style="width: 100%; margin-top: 6px; border-style: dashed;">
+      + 添加{{ cropMode === 'remove' ? '删除' : '保留' }}时间段
+    </el-button>
     <template #footer>
       <span class="dialog-footer">
         <el-button @click="cropDialogVisible = false">取消</el-button>
@@ -461,6 +531,58 @@
 <script src="https://unpkg.com/element-plus"></script>
 <script>
 const { createApp, ref, reactive, computed, onMounted, onUnmounted } = Vue;
+
+/* ========== IndexedDB 辅助：存储上传状态，用于断点续传 ========== */
+const uploadDB = {
+  db: null,
+  async init() {
+    return new Promise((resolve) => {
+      const request = indexedDB.open('SubtitleFlowUploads', 1);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('pending_uploads')) {
+          db.createObjectStore('pending_uploads', { keyPath: 'uploadId' });
+        }
+      };
+      request.onsuccess = (e) => { this.db = e.target.result; resolve(); };
+      request.onerror = () => { console.warn('IndexedDB 不可用，断点续传功能关闭'); resolve(); };
+    });
+  },
+  async save(state) {
+    if (!this.db) return;
+    try {
+      const tx = this.db.transaction('pending_uploads', 'readwrite');
+      tx.objectStore('pending_uploads').put(state);
+    } catch (e) { console.warn('IDB save fail', e); }
+  },
+  async get(uploadId) {
+    if (!this.db) return null;
+    try {
+      const tx = this.db.transaction('pending_uploads', 'readonly');
+      const req = tx.objectStore('pending_uploads').get(uploadId);
+      return new Promise((r) => { req.onsuccess = () => r(req.result || null); req.onerror = () => r(null); });
+    } catch (e) { return null; }
+  },
+  async getAll() {
+    if (!this.db) return [];
+    try {
+      const tx = this.db.transaction('pending_uploads', 'readonly');
+      const req = tx.objectStore('pending_uploads').getAll();
+      return new Promise((r) => { req.onsuccess = () => r(req.result || []); req.onerror = () => r([]); });
+    } catch (e) { return []; }
+  },
+  async remove(uploadId) {
+    if (!this.db) return;
+    try {
+      const tx = this.db.transaction('pending_uploads', 'readwrite');
+      tx.objectStore('pending_uploads').delete(uploadId);
+    } catch (e) { console.warn('IDB remove fail', e); }
+  }
+};
+
+const CHUNK_SIZE = 5 * 1024 * 1024;
+const CHUNK_THRESHOLD = 5 * 1024 * 1024;
+
 const app = createApp({
   setup() {
     const activeTab = ref('main');
@@ -473,7 +595,11 @@ const app = createApp({
     let pollingTimer = null;
     let elapsedTimer = null;
     let stepStartTime = null;
-    // 🆕 增加 '格式转换' 步骤
+    let isUploadingFlag = false;
+
+    const uploadChunkProgress = reactive({ uploaded: 0, total: 0 });
+    const pendingUploads = ref([]);
+
     const steps = reactive([
       { label: '格式转换', active: false, completed: false },
       { label: '生成提示词', active: false, completed: false },
@@ -482,95 +608,404 @@ const app = createApp({
       { label: '字幕压制', active: false, completed: false },
     ]);
 
-    const onFileChange = (file) => { selectedFile.value = file.raw; fileList.value = [file]; };
+    const onFileChange = (file) => {
+      selectedFile.value = file.raw;
+      fileList.value = [file];
+    };
+
+    /* ========== 上传逻辑 ========== */
     const uploadVideo = async () => {
       if (!selectedFile.value) return;
       uploading.value = true;
-      const formData = new FormData();
-      formData.append('file', selectedFile.value);
+      isUploadingFlag = true;
+      uploadChunkProgress.uploaded = 0;
+      uploadChunkProgress.total = 0;
       try {
-        const res = await fetch('/api/upload', { method: 'POST', body: formData });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || '上传失败');
-        task.value = { task_id: data.task_id, status: 'processing', step_progress: 0, current_step: '准备开始' };
-        startPolling(data.task_id);
-      } catch (e) { ElementPlus.ElMessage.error('上传失败: ' + e.message); }
-      finally { uploading.value = false; }
+        const file = selectedFile.value;
+        if (file.size >= CHUNK_THRESHOLD) {
+          await chunkedUpload(file);
+        } else {
+          await simpleUpload(file);
+        }
+      } catch (e) {
+        ElementPlus.ElMessage.error('上传失败: ' + e.message);
+      } finally {
+        uploading.value = false;
+        isUploadingFlag = false;
+        uploadChunkProgress.uploaded = 0;
+        uploadChunkProgress.total = 0;
+      }
     };
 
+    const simpleUpload = async (file) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || '上传失败');
+      task.value = { task_id: data.task_id, status: 'processing', step_progress: 0, current_step: '准备开始' };
+      startPolling(data.task_id);
+    };
+
+    const chunkedUpload = async (file) => {
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+      let uploadId = null;
+      let startChunk = 0;
+
+      // 检查可续传的上传
+      const allPending = await uploadDB.getAll();
+      const matching = allPending.find(p => p.fileName === file.name && p.fileSize === file.size);
+      if (matching) {
+        try {
+          const statusRes = await fetch('/api/upload/status/' + matching.uploadId);
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            if (statusData.status === 'uploading') {
+              uploadId = matching.uploadId;
+              const uploaded = statusData.uploaded_chunks || [];
+              startChunk = uploaded.length > 0 ? Math.max(...uploaded) + 1 : 0;
+              if (startChunk >= totalChunks) startChunk = totalChunks;
+              console.log('[upload] 续传: 从分片 ' + startChunk + '/' + totalChunks + ' 开始');
+            }
+          }
+        } catch (e) { /* 服务器端已过期，重新开始 */ }
+      }
+
+      if (!uploadId) {
+        const initRes = await fetch('/api/upload/init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, file_size: file.size, total_chunks: totalChunks })
+        });
+        const initData = await initRes.json();
+        if (!initRes.ok) throw new Error(initData.detail || '初始化上传失败');
+        uploadId = initData.upload_id;
+        startChunk = 0;
+      }
+
+      await uploadDB.save({ uploadId, fileName: file.name, fileSize: file.size, totalChunks, timestamp: Date.now() });
+      uploadChunkProgress.total = totalChunks;
+      uploadChunkProgress.uploaded = startChunk;
+
+      for (let i = startChunk; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunkBlob = file.slice(start, end);
+        const formData = new FormData();
+        formData.append('chunk', chunkBlob);
+        const chunkRes = await fetch('/api/upload/chunk?upload_id=' + uploadId + '&chunk_index=' + i, {
+          method: 'POST', body: formData
+        });
+        if (!chunkRes.ok) {
+          const errData = await chunkRes.json().catch(() => ({}));
+          throw new Error(errData.detail || '分片 ' + i + ' 上传失败');
+        }
+        uploadChunkProgress.uploaded = i + 1;
+        await uploadDB.save({ uploadId, fileName: file.name, fileSize: file.size, totalChunks, timestamp: Date.now() });
+      }
+
+      const completeRes = await fetch('/api/upload/complete?upload_id=' + uploadId, { method: 'POST' });
+      const completeData = await completeRes.json();
+      if (!completeRes.ok) throw new Error(completeData.detail || '完成上传失败');
+
+      await uploadDB.remove(uploadId);
+      task.value = { task_id: completeData.task_id, status: 'processing', step_progress: 0, current_step: '准备开始' };
+      startPolling(completeData.task_id);
+      await loadPendingUploads();
+    };
+
+    const cancelPendingUpload = async (uploadId) => {
+      await uploadDB.remove(uploadId);
+      await loadPendingUploads();
+    };
+
+    const loadPendingUploads = async () => {
+      const all = await uploadDB.getAll();
+      pendingUploads.value = all.map(p => ({ uploadId: p.uploadId, fileName: p.fileName, fileSize: p.fileSize }));
+    };
+
+    /* ========== 轮询 ========== */
     const startPolling = (taskId) => {
       stopPolling();
       pollingTimer = setInterval(async () => {
         try {
-          const res = await fetch(`/api/task/${taskId}`);
+          const res = await fetch('/api/task/' + taskId);
           const t = await res.json();
           if (!res.ok) throw new Error(t.detail);
           task.value = t;
           updateSteps(t.current_step);
-          if (t.step_started_at) { stepStartTime = new Date(t.step_started_at + 'Z').getTime(); startElapsedTimer(stepStartTime); }
+          if (t.step_started_at) {
+            stepStartTime = new Date(t.step_started_at + 'Z').getTime();
+            startElapsedTimer(stepStartTime);
+          }
           etaSec.value = t.eta_sec ?? null;
-          if (t.status === 'success' || t.status === 'failed') { stopPolling(); stopElapsedTimer(); fetchHistory(); }
+          if (t.status === 'success' || t.status === 'failed') {
+            stopPolling(); stopElapsedTimer(); fetchHistory();
+          }
         } catch (e) { console.error('轮询出错', e); }
       }, 1500);
     };
 
     const stopPolling = () => { if (pollingTimer) clearInterval(pollingTimer); };
     const stopElapsedTimer = () => { if (elapsedTimer) clearInterval(elapsedTimer); };
-    // 🆕 映射关系更新
+
     const updateSteps = (current) => {
       const map = { '格式转换': 0, '生成ASR提示词': 1, '语音识别': 2, '分析与翻译': 3, '压制字幕': 4 };
       const idx = map[current];
       steps.forEach((s, i) => { s.active = (i === idx); s.completed = (i < idx); });
-      if (!current || current === '完成' || current === '全部完成') { steps.forEach(s => { s.active = false; s.completed = true; }); }
+      if (!current || current === '完成' || current === '全部完成') {
+        steps.forEach(s => { s.active = false; s.completed = true; });
+      }
     };
 
-    const startElapsedTimer = (startTs) => { stopElapsedTimer(); elapsedTimer = setInterval(() => { elapsedSec.value = (Date.now() - startTs) / 1000; }, 200); };
-    const formatTime = (sec) => { if (sec == null || isNaN(sec)) return '--:--'; const m = Math.floor(sec / 60); const s = Math.floor(sec % 60); return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`; };
-    const formatFileSize = (bytes) => { if (!bytes) return '0 B'; const k = 1024; const sizes = ['B', 'KB', 'MB', 'GB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; };
-    const formatDate = (dateStr) => { if (!dateStr) return '-'; const normalized = dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr) ? dateStr : dateStr + 'Z'; const date = new Date(normalized); if (isNaN(date.getTime())) return '-'; return date.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }); };
-    const resetMain = () => { task.value = null; fileList.value = []; selectedFile.value = null; elapsedSec.value = 0; etaSec.value = null; steps.forEach(s => { s.active = false; s.completed = false; }); };
+    const startElapsedTimer = (startTs) => {
+      stopElapsedTimer();
+      elapsedTimer = setInterval(() => { elapsedSec.value = (Date.now() - startTs) / 1000; }, 200);
+    };
 
+    /* ========== 工具函数 ========== */
+    const formatTime = (sec) => {
+      if (sec == null || isNaN(sec)) return '--:--';
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return m.toString().padStart(2, '0') + ':' + s.toString().padStart(2, '0');
+    };
+
+    const formatFileSize = (bytes) => {
+      if (!bytes) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+    const formatDate = (dateStr) => {
+      if (!dateStr) return '-';
+      const normalized = dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr) ? dateStr : dateStr + 'Z';
+      const date = new Date(normalized);
+      if (isNaN(date.getTime())) return '-';
+      return date.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    };
+
+    const resetMain = () => {
+      task.value = null; fileList.value = []; selectedFile.value = null;
+      elapsedSec.value = 0; etaSec.value = null;
+      steps.forEach(s => { s.active = false; s.completed = false; });
+    };
+
+    /* ========== 历史记录 ========== */
     const historyTasks = ref([]);
     const historyFilter = reactive({ status: '', search: '' });
-    const filteredHistoryTasks = computed(() => { return historyTasks.value.filter(item => { const statusMatch = !historyFilter.status || item.status === historyFilter.status; const searchMatch = !historyFilter.search || (item.original_filename && item.original_filename.includes(historyFilter.search)); return statusMatch && searchMatch; }); });
-    const fetchHistory = async () => { try { const res = await fetch('/api/tasks'); const data = await res.json(); if (res.ok) { const tasks = data.tasks || []; historyTasks.value = tasks.map(item => ({ ...item, showCrops: false, cropsLoaded: false, crops: [] })); } } catch (e) { ElementPlus.ElMessage.error('获取历史失败: ' + e.message); } };
-    const deleteTask = async (taskId) => { try { const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' }); if (res.ok) { fetchHistory(); ElementPlus.ElMessage.success('删除成功'); } else { throw new Error('删除失败'); } } catch (e) { ElementPlus.ElMessage.error('删除失败: ' + e.message); } };
-    const cleanupCompleted = async () => { try { const res = await fetch('/api/tasks/cleanup', { method: 'POST' }); if (res.ok) { fetchHistory(); ElementPlus.ElMessage.success('清理完成'); } else { throw new Error('清理失败'); } } catch (e) { ElementPlus.ElMessage.error('清理失败: ' + e.message); } };
-    const downloadHistoryFile = (taskId, type) => { window.open(`/api/download/${taskId}/${type}`, '_blank'); };
-    const toggleCrops = async (item) => { item.showCrops = !item.showCrops; if (item.showCrops && !item.cropsLoaded) { try { const res = await fetch(`/api/tasks/${item.task_id}/crops`); const data = await res.json(); if (res.ok) { item.crops = data.crops || []; item.cropsLoaded = true; } } catch (e) { ElementPlus.ElMessage.error('获取裁剪记录失败: ' + e.message); } } };
-    const downloadCropFile = (cropId) => { window.open(`/api/download/crop/${cropId}`, '_blank'); };
-    const reprocessTask = async (taskId) => { try { const res = await fetch(`/api/tasks/${taskId}/reprocess`, { method: 'POST' }); const data = await res.json(); if (!res.ok) throw new Error(data.detail || '重新制作失败'); steps.forEach(s => { s.active = false; s.completed = false; }); task.value = { task_id: taskId, status: 'processing', step_progress: 0, current_step: '准备开始' }; elapsedSec.value = 0; etaSec.value = null; selectedFile.value = null; fileList.value = []; activeTab.value = 'main'; startPolling(taskId); ElementPlus.ElMessage.success('已开始重新制作'); } catch (e) { ElementPlus.ElMessage.error('重新制作失败: ' + e.message); } };
+    const filteredHistoryTasks = computed(() => {
+      return historyTasks.value.filter(item => {
+        const statusMatch = !historyFilter.status || item.status === historyFilter.status;
+        const searchMatch = !historyFilter.search || (item.original_filename && item.original_filename.includes(historyFilter.search));
+        return statusMatch && searchMatch;
+      });
+    });
 
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch('/api/tasks');
+        const data = await res.json();
+        if (res.ok) {
+          historyTasks.value = (data.tasks || []).map(item => ({ ...item, showCrops: false, cropsLoaded: false, crops: [] }));
+        }
+      } catch (e) { ElementPlus.ElMessage.error('获取历史失败: ' + e.message); }
+    };
+
+    const deleteTask = async (taskId) => {
+      try {
+        const res = await fetch('/api/tasks/' + taskId, { method: 'DELETE' });
+        if (res.ok) { fetchHistory(); ElementPlus.ElMessage.success('删除成功'); }
+        else throw new Error('删除失败');
+      } catch (e) { ElementPlus.ElMessage.error('删除失败: ' + e.message); }
+    };
+
+    const cleanupCompleted = async () => {
+      try {
+        const res = await fetch('/api/tasks/cleanup', { method: 'POST' });
+        if (res.ok) { fetchHistory(); ElementPlus.ElMessage.success('清理完成'); }
+        else throw new Error('清理失败');
+      } catch (e) { ElementPlus.ElMessage.error('清理失败: ' + e.message); }
+    };
+
+    const downloadHistoryFile = (taskId, type) => { window.open('/api/download/' + taskId + '/' + type, '_blank'); };
+
+    const toggleCrops = async (item) => {
+      item.showCrops = !item.showCrops;
+      if (item.showCrops && !item.cropsLoaded) {
+        try {
+          const res = await fetch('/api/tasks/' + item.task_id + '/crops');
+          const data = await res.json();
+          if (res.ok) { item.crops = data.crops || []; item.cropsLoaded = true; }
+        } catch (e) { ElementPlus.ElMessage.error('获取裁剪记录失败: ' + e.message); }
+      }
+    };
+
+    const downloadCropFile = (cropId) => { window.open('/api/download/crop/' + cropId, '_blank'); };
+
+    const reprocessTask = async (taskId) => {
+      try {
+        const res = await fetch('/api/tasks/' + taskId + '/reprocess', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '重新制作失败');
+        steps.forEach(s => { s.active = false; s.completed = false; });
+        task.value = { task_id: taskId, status: 'processing', step_progress: 0, current_step: '准备开始' };
+        elapsedSec.value = 0; etaSec.value = null; selectedFile.value = null; fileList.value = [];
+        activeTab.value = 'main';
+        startPolling(taskId);
+        ElementPlus.ElMessage.success('已开始重新制作');
+      } catch (e) { ElementPlus.ElMessage.error('重新制作失败: ' + e.message); }
+    };
+
+    /* ========== 裁剪 ========== */
     const cropDialogVisible = ref(false);
     const currentCropTaskId = ref('');
     const cropSegments = ref([{ start: '00:03:04', end: '00:04:08' }]);
     const cropSubmitting = ref(false);
     const cropMode = ref('remove');
-    const openCropDialog = (taskId) => { currentCropTaskId.value = taskId; cropSegments.value = [{ start: '00:03:04', end: '00:04:08' }]; cropMode.value = 'remove'; cropDialogVisible.value = true; };
+
+    const openCropDialog = (taskId) => {
+      currentCropTaskId.value = taskId;
+      cropSegments.value = [{ start: '00:03:04', end: '00:04:08' }];
+      cropMode.value = 'remove';
+      cropDialogVisible.value = true;
+    };
     const addCropSegment = () => { cropSegments.value.push({ start: '', end: '' }); };
     const removeCropSegment = (idx) => { cropSegments.value.splice(idx, 1); };
-    const submitCrop = async () => { if (!currentCropTaskId.value || cropSegments.value.some(seg => !seg.start || !seg.end)) { ElementPlus.ElMessage.warning('请填写完整的时间段'); return; } cropSubmitting.value = true; try { const res = await fetch(`/api/tasks/${currentCropTaskId.value}/crop`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ segments: cropSegments.value, mode: cropMode.value }) }); if (res.ok) { ElementPlus.ElMessage.success('裁剪任务已提交'); cropDialogVisible.value = false; fetchHistory(); startCropPolling(currentCropTaskId.value); } else { const err = await res.json(); throw new Error(err.detail || '提交失败'); } } catch (e) { ElementPlus.ElMessage.error('提交失败: ' + e.message); } finally { cropSubmitting.value = false; } };
+
+    const submitCrop = async () => {
+      if (!currentCropTaskId.value || cropSegments.value.some(seg => !seg.start || !seg.end)) {
+        ElementPlus.ElMessage.warning('请填写完整的时间段'); return;
+      }
+      cropSubmitting.value = true;
+      try {
+        const res = await fetch('/api/tasks/' + currentCropTaskId.value + '/crop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ segments: cropSegments.value, mode: cropMode.value })
+        });
+        if (res.ok) {
+          ElementPlus.ElMessage.success('裁剪任务已提交');
+          cropDialogVisible.value = false; fetchHistory();
+          startCropPolling(currentCropTaskId.value);
+        } else {
+          const err = await res.json();
+          throw new Error(err.detail || '提交失败');
+        }
+      } catch (e) { ElementPlus.ElMessage.error('提交失败: ' + e.message); }
+      finally { cropSubmitting.value = false; }
+    };
 
     let cropPollTimer = null;
-    const startCropPolling = (taskId) => { if (cropPollTimer) clearInterval(cropPollTimer); let lastCropCount = 0; cropPollTimer = setInterval(async () => { try { const res = await fetch(`/api/tasks/${taskId}/crops`); const data = await res.json(); if (!res.ok) return; const crops = data.crops || []; const allDone = crops.length > 0 && crops.every(c => c.status === 'success' || c.status === 'failed'); const item = historyTasks.value.find(t => t.task_id === taskId); if (item && item.showCrops) { item.crops = crops; item.cropsLoaded = true; } if (allDone) { clearInterval(cropPollTimer); cropPollTimer = null; const successCount = crops.filter(c => c.status === 'success').length; if (successCount > lastCropCount) { ElementPlus.ElMessage.success(`${successCount} 个裁剪任务已完成`); } } lastCropCount = crops.filter(c => c.status === 'success').length; } catch (e) { console.error('裁剪轮询出错', e); } }, 2000); };
+    const startCropPolling = (taskId) => {
+      if (cropPollTimer) clearInterval(cropPollTimer);
+      let lastCropCount = 0;
+      cropPollTimer = setInterval(async () => {
+        try {
+          const res = await fetch('/api/tasks/' + taskId + '/crops');
+          const data = await res.json();
+          if (!res.ok) return;
+          const crops = data.crops || [];
+          const allDone = crops.length > 0 && crops.every(c => c.status === 'success' || c.status === 'failed');
+          const item = historyTasks.value.find(t => t.task_id === taskId);
+          if (item && item.showCrops) { item.crops = crops; item.cropsLoaded = true; }
+          if (allDone) {
+            clearInterval(cropPollTimer); cropPollTimer = null;
+            const successCount = crops.filter(c => c.status === 'success').length;
+            if (successCount > lastCropCount) ElementPlus.ElMessage.success(successCount + ' 个裁剪任务已完成');
+          }
+          lastCropCount = crops.filter(c => c.status === 'success').length;
+        } catch (e) { console.error('裁剪轮询出错', e); }
+      }, 2000);
+    };
 
-    const configForm = reactive({ features: { enable_asr_prompt: true, enable_ad_detection: false, enable_summary: false, enable_titles: false }, ollama: { analysis: { model: 'qwen2:7b', temperature: 0.1 }, translate: { model: 'qwen2:7b', temperature: 0.1 } }, translate_backend: 'ollama', online_api: { base_url: 'https://api.openai.com', api_key: '', model: 'gpt-3.5-turbo', batch_mode: false, batch_size: 5 }, local_translation: { model_dir: '', topic: '' }, font: { zh: 'SimHei', en: 'Arial', scale: 1.0 } });
+    /* ========== 配置 ========== */
+    const configForm = reactive({
+      features: { enable_asr_prompt: true, enable_ad_detection: false, enable_summary: false, enable_titles: false },
+      ollama: { analysis: { model: 'qwen2:7b', temperature: 0.1 }, translate: { model: 'qwen2:7b', temperature: 0.1 } },
+      translate_backend: 'ollama',
+      online_api: { base_url: 'https://api.openai.com', api_key: '', model: 'gpt-3.5-turbo', batch_mode: false, batch_size: 5, fallbacks: [] },
+      local_translation: { model_dir: '', topic: '' },
+      font: { zh: 'SimHei', en: 'Arial', scale: 1.0 }
+    });
+
     const topicPreset = ref('');
     const configSaved = ref(false);
-    const onTopicChange = (val) => { const topics = { football: 'football match analysis tactics players', f1: 'F1 racing driver circuit lap time strategy', basketball: 'basketball game players tactics score', esports: 'esports game tournament players strategy' }; if (val && val !== 'custom') { configForm.local_translation.topic = topics[val]; } else if (val === 'custom') { configForm.local_translation.topic = ''; } else { configForm.local_translation.topic = ''; } };
-    const saveConfig = async () => { try { const res = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(configForm) }); if (res.ok) { configSaved.value = true; ElementPlus.ElMessage.success('配置保存成功'); setTimeout(() => { configSaved.value = false; }, 2000); } else { throw new Error('保存失败'); } } catch (e) { ElementPlus.ElMessage.error('保存失败: ' + e.message); } };
 
-    onMounted(() => { fetchHistory(); fetch('/api/config').then(res => res.json()).then(data => { Object.assign(configForm, data); }).catch(() => {}); });
-    onUnmounted(() => { stopPolling(); stopElapsedTimer(); if (cropPollTimer) clearInterval(cropPollTimer); });
+    const onTopicChange = (val) => {
+      const topics = { football: 'football match analysis tactics players', f1: 'F1 racing driver circuit lap time strategy', basketball: 'basketball game players tactics score', esports: 'esports game tournament players strategy' };
+      if (val && val !== 'custom') configForm.local_translation.topic = topics[val];
+      else if (val === 'custom') configForm.local_translation.topic = '';
+      else configForm.local_translation.topic = '';
+    };
+
+    const addFallback = () => {
+      if (!configForm.online_api.fallbacks) configForm.online_api.fallbacks = [];
+      configForm.online_api.fallbacks.push({ name: '备用' + (configForm.online_api.fallbacks.length + 1), base_url: '', api_key: '', model: '' });
+    };
+
+    const removeFallback = (idx) => {
+      configForm.online_api.fallbacks.splice(idx, 1);
+    };
+
+    const saveConfig = async () => {
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(configForm)
+        });
+        if (res.ok) {
+          configSaved.value = true;
+          ElementPlus.ElMessage.success('配置保存成功');
+          setTimeout(() => { configSaved.value = false; }, 2000);
+        } else throw new Error('保存失败');
+      } catch (e) { ElementPlus.ElMessage.error('保存失败: ' + e.message); }
+    };
+
+    /* ========== beforeunload 警告 ========== */
+    const onBeforeUnload = (e) => {
+      if (isUploadingFlag) {
+        e.preventDefault();
+        e.returnValue = '视频正在上传中，离开可能导致上传中断。是否继续？';
+      }
+    };
+
+    /* ========== 生命周期 ========== */
+    onMounted(async () => {
+      await uploadDB.init();
+      await loadPendingUploads();
+      fetchHistory();
+      fetch('/api/config').then(res => res.json()).then(data => {
+        Object.assign(configForm, data);
+        // 确保 fallbacks 是数组
+        if (!configForm.online_api.fallbacks) configForm.online_api.fallbacks = [];
+      }).catch(() => {});
+      window.addEventListener('beforeunload', onBeforeUnload);
+    });
+
+    onUnmounted(() => {
+      stopPolling(); stopElapsedTimer();
+      if (cropPollTimer) clearInterval(cropPollTimer);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    });
 
     return {
-      activeTab, fileList, selectedFile, uploading, task, elapsedSec, etaSec, steps, onFileChange, uploadVideo, resetMain, formatTime, formatFileSize,
-      historyFilter, filteredHistoryTasks, fetchHistory, deleteTask, cleanupCompleted, downloadHistoryFile, toggleCrops, downloadCropFile, reprocessTask,
-      cropDialogVisible, currentCropTaskId, cropSegments, cropSubmitting, cropMode, openCropDialog, addCropSegment, removeCropSegment, submitCrop,
-      configForm, topicPreset, configSaved, onTopicChange, saveConfig, formatDate
+      activeTab, fileList, selectedFile, uploading, task, elapsedSec, etaSec, steps,
+      onFileChange, uploadVideo, resetMain, formatTime, formatFileSize,
+      uploadChunkProgress, pendingUploads, cancelPendingUpload,
+      historyFilter, filteredHistoryTasks, fetchHistory, deleteTask, cleanupCompleted,
+      downloadHistoryFile, toggleCrops, downloadCropFile, reprocessTask,
+      cropDialogVisible, currentCropTaskId, cropSegments, cropSubmitting, cropMode,
+      openCropDialog, addCropSegment, removeCropSegment, submitCrop,
+      configForm, topicPreset, configSaved, onTopicChange, saveConfig,
+      addFallback, removeFallback, formatDate
     };
   }
 });
+
 app.use(ElementPlus);
 app.mount('#app');
 </script>

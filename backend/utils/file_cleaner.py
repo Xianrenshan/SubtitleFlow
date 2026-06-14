@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 import shutil
@@ -12,7 +13,6 @@ async def clean_old_files():
     """清理超过 TASK_RETENTION_HOURS 的任务关联文件"""
     cutoff = datetime.now() - timedelta(hours=backend_config.TASK_RETENTION_HOURS)
     upload_dir = backend_config.UPLOAD_DIR
-    
     if upload_dir.exists():
         # 🆕 遍历所有文件，不再局限于 *.mp4
         for file in upload_dir.iterdir():
@@ -27,6 +27,32 @@ async def clean_old_files():
             if sub.is_file() and sub.suffix in [".srt", ".txt", ".json", ".mp4", ".ass"]:
                 if datetime.fromtimestamp(sub.stat().st_mtime) < cutoff:
                     sub.unlink()
+
+    # 🆕 清理过期的分片上传目录
+    chunks_dir = upload_dir / ".chunks"
+    if chunks_dir.exists():
+        for session_dir in chunks_dir.iterdir():
+            if session_dir.is_dir():
+                # 检查元数据中的创建时间
+                meta_path = session_dir / "meta.json"
+                if meta_path.exists():
+                    try:
+                        with open(meta_path, "r", encoding="utf-8") as f:
+                            meta = json.load(f)
+                        created_str = meta.get("created_at", "")
+                        if created_str:
+                            created = datetime.fromisoformat(created_str)
+                            if created < cutoff:
+                                shutil.rmtree(session_dir, ignore_errors=True)
+                                print(f"[cleaner] 清理过期分片上传: {session_dir.name}")
+                    except Exception as e:
+                        # 元数据损坏，按目录修改时间清理
+                        if datetime.fromtimestamp(session_dir.stat().st_mtime) < cutoff:
+                            shutil.rmtree(session_dir, ignore_errors=True)
+                else:
+                    # 无元数据，按目录修改时间清理
+                    if datetime.fromtimestamp(session_dir.stat().st_mtime) < cutoff:
+                        shutil.rmtree(session_dir, ignore_errors=True)
 
     # 删除数据库中的旧任务记录
     await delete_old_tasks(backend_config.TASK_RETENTION_HOURS)
