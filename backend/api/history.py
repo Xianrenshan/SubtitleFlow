@@ -2,11 +2,11 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 import shutil
 from pathlib import Path
+
 from backend.database import get_all_tasks, delete_task_by_id, delete_tasks_by_ids, get_task
 from backend.config import backend_config
 
 router = APIRouter()
-
 
 def _delete_task_files(task):
     """删除 uploads 中的源视频和 output/任务ID 整个目录"""
@@ -20,14 +20,14 @@ def _delete_task_files(task):
     if output_dir.exists():
         shutil.rmtree(output_dir, ignore_errors=True)
 
-
 @router.get("/tasks")
 async def list_tasks(
     status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None), # 🆕 新增搜索参数
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100)
+    page_size: int = Query(20, ge=1, le=1000) # 🆕 放宽最大限制
 ):
-    tasks, total = await get_all_tasks(status=status, page=page, page_size=page_size)
+    tasks, total = await get_all_tasks(status=status, page=page, page_size=page_size, search=search)
     return {
         "total": total,
         "page": page,
@@ -52,7 +52,6 @@ async def list_tasks(
         ]
     }
 
-
 @router.delete("/tasks/{task_id}")
 async def delete_single_task(task_id: str):
     task = await get_task(task_id)
@@ -62,7 +61,6 @@ async def delete_single_task(task_id: str):
     await delete_task_by_id(task_id)
     return {"status": "ok"}
 
-
 @router.post("/tasks/batch-delete")
 async def batch_delete(task_ids: List[str]):
     for tid in task_ids:
@@ -71,7 +69,6 @@ async def batch_delete(task_ids: List[str]):
             _delete_task_files(task)
     await delete_tasks_by_ids(task_ids)
     return {"deleted": len(task_ids)}
-
 
 @router.post("/tasks/cleanup")
 async def cleanup_completed():
@@ -83,9 +80,7 @@ async def cleanup_completed():
     await delete_tasks_by_ids(ids)
     return {"deleted": len(ids)}
 
-
 # ==================== 新增：重新制作 ====================
-
 @router.post("/tasks/{task_id}/reprocess")
 async def reprocess_task(task_id: str):
     """重新制作：复用同一 task_id，用最新配置重新跑流水线"""
@@ -101,5 +96,4 @@ async def reprocess_task(task_id: str):
     import asyncio
     from backend.tasks import start_pipeline
     asyncio.create_task(start_pipeline(task_id, Path(task.input_video_path)))
-
     return {"task_id": task_id, "status": "processing"}
