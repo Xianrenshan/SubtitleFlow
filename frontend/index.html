@@ -1,10 +1,13 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>199 视频处理中枢</title>
+    <!-- Element Plus 基础样式 -->
     <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+    <!-- 引入 Element Plus 原生暗黑模式变量 -->
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/theme-chalk/dark/css-vars.css">
     <style>
         :root {
             --bg-primary: #0b0f19;
@@ -447,7 +450,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(0, 0, 0, 0.25);
             padding: 8px 12px;
             border-radius: 6px;
             font-size: 13px;
@@ -550,21 +553,6 @@
             background: rgba(255,255,255,0.05);
         }
 
-        /* 🆕 修复 Element Plus 深色主题下拉弹层样式 */
-        .el-select-dropdown {
-            background-color: var(--bg-secondary) !important;
-            border: 1px solid var(--glass-border) !important;
-        }
-        .el-select-dropdown__item {
-            color: var(--text-secondary) !important;
-        }
-        .el-select-dropdown__item.hover, 
-        .el-select-dropdown__item:hover,
-        .el-select-dropdown__item.selected {
-            background-color: rgba(6, 182, 212, 0.1) !important;
-            color: var(--accent-cyan) !important;
-        }
-
         .fallback-card {
             background: rgba(0,0,0,0.2);
             border: 1px solid var(--glass-border);
@@ -587,6 +575,52 @@
         .upload-progress-bar .el-progress__text {
             color: var(--text-secondary) !important;
             font-size: 12px !important;
+        }
+
+        /* ==================== 🛠 🆕 新增：原地垂直单选筛选组样式 ==================== */
+        .vertical-filter-group {
+            display: inline-flex !important;
+            flex-direction: column !important;
+            gap: 6px !important;
+        }
+
+        .vertical-filter-group .el-radio-button {
+            display: block !important;
+        }
+
+        .vertical-filter-group .el-radio-button__inner {
+            display: block !important;
+            width: 100px !important; /* 精致窄宽度，保证在筛选栏内不占过大横宽 */
+            border-radius: 8px !important; /* 独立小圆角，增强科技感 */
+            border: 1px solid var(--glass-border) !important;
+            background: rgba(255, 255, 255, 0.02) !important;
+            color: var(--text-secondary) !important;
+            text-align: center !important;
+            padding: 8px 12px !important;
+            font-size: 13px !important;
+            transition: all 0.25s !important;
+            box-shadow: none !important;
+        }
+
+        .vertical-filter-group .el-radio-button__inner:hover {
+            color: var(--accent-cyan) !important;
+            border-color: var(--accent-cyan) !important;
+            background: rgba(6, 182, 212, 0.04) !important;
+        }
+
+        /* 选中状态 */
+        .vertical-filter-group .el-radio-button__original-radio:checked + .el-radio-button__inner {
+            background: rgba(6, 182, 212, 0.15) !important;
+            color: var(--accent-cyan) !important;
+            border-color: var(--accent-cyan) !important;
+            font-weight: 600 !important;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.1) !important;
+        }
+
+        /* 统一覆盖可能污染的 Element Plus 下拉容器（全局备用） */
+        .el-select-dropdown {
+            background-color: var(--bg-secondary) !important;
+            border: 1px solid var(--glass-border) !important;
         }
 
         @media (max-width: 768px) {
@@ -744,21 +778,29 @@
             <!-- ==================== 历史记录 ==================== -->
             <el-tab-pane label="📜 任务历史" name="history">
                 <div class="glass-card">
-                    <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
-                        <el-select v-model="historyFilter.status" placeholder="筛选状态" clearable @change="fetchHistory" style="width: 150px;">
-                            <el-option label="全部" value="" />
-                            <el-option label="准备中" value="pending" />
-                            <el-option label="处理中" value="processing" />
-                            <el-option label="成功" value="success" />
-                            <el-option label="失败" value="failed" />
-                        </el-select>
-                        <el-input v-model="historyFilter.search" placeholder="搜索文件名..." clearable @input="onSearchInput" @clear="fetchHistory" style="width: 220px;" />
-                        <el-button @click="fetchHistory" type="primary" plain>刷新</el-button>
-                        <el-popconfirm title="确定清除所有已完成和失败的任务？" @confirm="cleanupCompleted">
-                            <template #reference>
-                                <el-button type="danger" plain>一键清理已完成</el-button>
-                            </template>
-                        </el-popconfirm>
+                    <!-- 🆕 对齐方式改为 align-items: flex-start，与左侧垂直按钮完美并列 -->
+                    <div style="display: flex; gap: 16px; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap;">
+                        <!-- 🆕 用垂直排列的单选按钮组替代原有的 el-select 下拉框，安全稳定 -->
+                        <el-radio-group v-model="historyFilter.status" @change="fetchHistory" class="vertical-filter-group">
+                            <el-radio-button label="">全部</el-radio-button>
+                            <el-radio-button label="pending">准备中</el-radio-button>
+                            <el-radio-button label="processing">处理中</el-radio-button>
+                            <el-radio-button label="success">成功</el-radio-button>
+                            <el-radio-button label="failed">失败</el-radio-button>
+                        </el-radio-group>
+
+                        <!-- 右侧控制区 -->
+                        <div style="display: flex; flex-direction: column; gap: 12px; flex: 1; min-width: 280px;">
+                            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                                <el-input v-model="historyFilter.search" placeholder="搜索文件名..." clearable @input="onSearchInput" @clear="fetchHistory" style="width: 220px;" />
+                                <el-button @click="fetchHistory" type="primary" plain>刷新</el-button>
+                                <el-popconfirm title="确定清除所有已完成和失败的任务？" @confirm="cleanupCompleted">
+                                    <template #reference>
+                                        <el-button type="danger" plain>一键清理已完成</el-button>
+                                    </template>
+                                </el-popconfirm>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="history-grid">
@@ -1287,7 +1329,7 @@
                 const historyTasks = ref([]);
                 const historyFilter = reactive({ status: '', search: '' });
 
-                // 🆕 防抖函数：避免搜索时频繁发请求
+                // 防抖函数：避免搜索时频繁发请求
                 let debounceTimer = null;
                 const onSearchInput = () => {
                     if (debounceTimer) clearTimeout(debounceTimer);
@@ -1297,13 +1339,13 @@
                 };
 
                 const filteredHistoryTasks = computed(() => {
-                    // 🚨 移除本地 search 过滤，完全依赖后端返回结果
+                    // 移除本地 search 过滤，完全依赖后端返回结果
                     return historyTasks.value;
                 });
 
                 const fetchHistory = async () => {
                     try {
-                        // 🆕 拼接完整的请求参数，并请求大数量数据
+                        // 拼接完整的请求参数，并请求大数量数据
                         const params = new URLSearchParams();
                         if (historyFilter.status) params.append('status', historyFilter.status);
                         if (historyFilter.search) params.append('search', historyFilter.search);
