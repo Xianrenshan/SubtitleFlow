@@ -346,17 +346,22 @@
             flex-direction: column;
             align-items: center;
             padding: 24px 0;
+            width: 100%;
+            overflow: hidden;
         }
 
         .progress-ring {
             position: relative;
-            width: 160px;
-            height: 160px;
+            width: 180px;
+            height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .progress-ring .el-progress {
-            width: 160px !important;
-            height: 160px !important;
+            width: 180px;
+            height: 180px;
         }
 
         .progress-ring .el-progress__text {
@@ -629,6 +634,8 @@
             justify-content: space-between;
             margin-bottom: 16px;
             min-height: 40px;
+            flex-wrap: wrap;
+            gap: 8px;
         }
 
         .config-row .desc {
@@ -1036,7 +1043,74 @@
             font-size: 14px;
         }
 
-        /* Responsive */
+        /* Responsive - Tablet */
+        @media (max-width: 1024px) {
+            #app {
+                padding: 32px 20px;
+                max-width: 100%;
+            }
+            .app-header h1 {
+                font-size: 28px;
+            }
+            .config-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+                margin-bottom: 20px;
+            }
+            .config-row .desc {
+                margin-left: 0;
+                margin-top: 4px;
+            }
+            .config-row .el-form-item,
+            .config-row .el-input,
+            .config-row .el-select,
+            .config-row .el-slider {
+                width: 100% !important;
+                max-width: 100%;
+            }
+            .fallback-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            .history-grid {
+                grid-template-columns: 1fr;
+            }
+            .download-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .time-cards {
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .upload-zone {
+                padding: 32px 20px;
+            }
+            .glass-card {
+                padding: 20px 16px;
+            }
+            .step-timeline {
+                gap: 8px;
+            }
+            .step-item {
+                min-width: 0;
+            }
+            .step-label {
+                font-size: 12px;
+            }
+            .step-circle {
+                width: 28px;
+                height: 28px;
+                font-size: 12px;
+            }
+            .step-line {
+                top: 14px;
+            }
+        }
+
+        /* Responsive - Mobile */
         @media (max-width: 768px) {
             #app {
                 padding: 24px 16px;
@@ -1057,8 +1131,27 @@
             .app-header h1 {
                 font-size: 24px;
             }
+            .download-grid {
+                grid-template-columns: 1fr;
+            }
+            .config-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            .vertical-filter-group {
+                flex-direction: row !important;
+                flex-wrap: wrap;
+                width: 100%;
+            }
+            .vertical-filter-group .el-radio-button__inner {
+                width: auto !important;
+                flex: 1;
+                min-width: 80px;
+            }
         }
     </style>
+<base target="_blank">
 <base target="_blank">
 </head>
 <body>
@@ -1129,7 +1222,7 @@
 
                     <div v-if="task.status === 'processing' || task.status === 'pending'" class="dashboard">
                         <div class="progress-ring">
-                            <el-progress type="circle" :percentage="Math.round(task.step_progress || 0)" :stroke-width="12" :width="200" color="url(#gradient)">
+                            <el-progress type="circle" :percentage="Math.round(task.step_progress || 0)" :stroke-width="12" :width="180" color="url(#gradient)">
                                 <template #default>
                                     <div class="progress-center">
                                         <div class="progress-percent">{{ Math.round(task.step_progress || 0) }}%</div>
