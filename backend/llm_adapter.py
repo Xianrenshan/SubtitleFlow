@@ -54,7 +54,7 @@ def send_llm_request(
         "openai": "openai",
         "deepseek": "deepseek",
         "siliconflow": "openai",  # SiliconFlow 完全兼容 OpenAI 格式，通过 api_base 路由
-        "zhipu": "zhipu",
+        "zhipu": "zai",
         "qwen": "dashscope",     # 通义千问在 LiteLLM 中的前缀是 dashscope
         "moonshot": "moonshot"
     }
