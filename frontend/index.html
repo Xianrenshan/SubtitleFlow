@@ -1,1260 +1,901 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>199 视频处理中枢</title>
-  <!-- Element Plus 基础样式 -->
-  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
-  <style>
-    /* ============================================================
-       Vercel Design System - Light Theme
-    ============================================================ */
-    :root {
-      /* Background */
-      --bg-primary: #ffffff;
-      --bg-secondary: #fafafa;
-      --bg-tertiary: #f5f5f5;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>199 视频处理中枢</title>
+<!-- Element Plus 基础样式 -->
+<link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+<style>
+/* ============================================================
+Vercel Design System - Light Theme
+============================================================ */
+:root {
+/* Background */
+--bg-primary: #ffffff;
+--bg-secondary: #fafafa;
+--bg-tertiary: #f5f5f5;
+/* Surface */
+--surface: #ffffff;
+--surface-hover: #fafafa;
+/* Border */
+--border: #eaeaea;
+--border-strong: #ddd;
+/* Text */
+--text-primary: #000000;
+--text-secondary: #666666;
+--text-tertiary: #888888;
+--text-disabled: #999999;
+/* Brand / Accent */
+--accent: #000000;
+--accent-hover: #333333;
+--accent-text: #ffffff;
+--link: #0070f3;
+/* Status */
+--success: #0070f3;
+--warning: #f5a623;
+--danger: #e00;
+/* Spacing */
+--space-1: 4px;
+--space-2: 8px;
+--space-3: 12px;
+--space-4: 16px;
+--space-5: 24px;
+--space-6: 32px;
+--space-7: 48px;
+/* Radius */
+--radius-sm: 4px;
+--radius-md: 6px;
+--radius-lg: 8px;
+--radius-xl: 12px;
+/* Shadow */
+--shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+--shadow-md: 0 2px 4px rgba(0,0,0,0.04);
+--shadow-lg: 0 4px 8px rgba(0,0,0,0.04);
+/* Font */
+--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+--font-mono: 'Geist Mono', 'SF Mono', 'Fira Code', 'Courier New', monospace;
+/* Legacy variable mappings (for inline style compatibility) */
+--glass-bg: var(--surface);
+--glass-border: var(--border);
+--shadow-glass: var(--shadow-sm);
+--accent-cyan: var(--text-primary);
+--accent-blue: var(--link);
+}
 
-      /* Surface */
-      --surface: #ffffff;
-      --surface-hover: #fafafa;
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+font-family: var(--font-sans);
+background: var(--bg-primary);
+color: var(--text-primary);
+min-height: 100vh;
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+line-height: 1.5;
+}
+#app { max-width: 1200px; margin: 0 auto; padding: 48px 24px; }
 
-      /* Border */
-      --border: #eaeaea;
-      --border-strong: #ddd;
+/* Header */
+.app-header { text-align: center; margin-bottom: 48px; }
+.app-header h1 { font-size: 32px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; letter-spacing: -0.02em; }
+.app-header p { color: var(--text-secondary); font-size: 14px; font-weight: 400; }
 
-      /* Text */
-      --text-primary: #000000;
-      --text-secondary: #666666;
-      --text-tertiary: #888888;
-      --text-disabled: #999999;
+/* Tabs - Override border-card to clean underline style */
+.el-tabs { background: transparent; border: none; }
+.el-tabs--border-card { background: transparent; border: none; box-shadow: none; }
+.el-tabs--border-card > .el-tabs__content { padding: 0; }
+.el-tabs__header { margin-bottom: 32px; background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 0; }
+.el-tabs--border-card > .el-tabs__header { background: transparent; border: none; border-bottom: 1px solid var(--border); }
+.el-tabs__nav { border: none; }
+.el-tabs__item { color: var(--text-secondary) !important; border-radius: 0; transition: color 0.15s ease; height: 40px; line-height: 40px; margin: 0 24px 0 0; padding: 0 4px; font-weight: 500; font-size: 14px; border: none !important; }
+.el-tabs--border-card > .el-tabs__header .el-tabs__item { border: none; color: var(--text-secondary); }
+.el-tabs__item.is-active { color: var(--text-primary) !important; background: transparent; font-weight: 600; }
+.el-tabs--border-card > .el-tabs__header .el-tabs__item.is-active { color: var(--text-primary); background: transparent; }
+.el-tabs__active-bar { background: var(--accent); height: 2px; border-radius: 0; }
 
-      /* Brand / Accent */
-      --accent: #000000;
-      --accent-hover: #333333;
-      --accent-text: #ffffff;
-      --link: #0070f3;
+/* Cards */
+.glass-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 24px; margin-bottom: 24px; transition: border-color 0.15s ease; }
+.glass-card:hover { border-color: var(--border-strong); }
 
-      /* Status */
-      --success: #0070f3;
-      --warning: #f5a623;
-      --danger: #e00;
+/* Upload */
+.upload-zone { border: 1px dashed var(--border); border-radius: var(--radius-lg); padding: 48px; text-align: center; transition: all 0.15s ease; cursor: pointer; background: var(--bg-secondary); }
+.upload-zone:hover { border-color: var(--text-primary); background: var(--bg-tertiary); }
+.upload-zone .el-upload-dragger { background: transparent; border: none; width: 100%; }
+.upload-file-info { margin-top: 16px; color: var(--text-secondary); font-size: 14px; }
+.advanced-options-panel { margin-top: 12px; text-align: left; }
+.subtitle-upload-box { margin-top: 12px; padding: 16px; border: 1px dashed var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); }
+.subtitle-upload-box .el-upload-dragger { background: transparent; border: none; width: 100%; padding: 16px; }
+.subtitle-success-hint { margin-top: 8px; font-size: 13px; color: var(--success); }
 
-      /* Spacing */
-      --space-1: 4px;
-      --space-2: 8px;
-      --space-3: 12px;
-      --space-4: 16px;
-      --space-5: 24px;
-      --space-6: 32px;
-      --space-7: 48px;
+/* Buttons */
+.action-btn { width: 100%; background: var(--accent); border: 1px solid var(--accent); color: var(--accent-text); font-weight: 500; font-size: 14px; height: 44px; border-radius: var(--radius-md); transition: all 0.15s ease; letter-spacing: 0; box-shadow: none; }
+.action-btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); transform: none; box-shadow: none; }
+.action-btn.is-disabled { background: var(--bg-tertiary); border-color: var(--border); color: var(--text-disabled); box-shadow: none; }
 
-      /* Radius */
-      --radius-sm: 4px;
-      --radius-md: 6px;
-      --radius-lg: 8px;
-      --radius-xl: 12px;
+/* Steps */
+.step-timeline { display: flex; justify-content: space-between; margin: 32px 0; }
+.step-item { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; color: var(--text-tertiary); transition: color 0.15s ease; }
+.step-item.active { color: var(--text-primary); }
+.step-item.completed { color: var(--text-primary); }
+.step-circle { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-secondary); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; position: relative; z-index: 2; transition: all 0.15s ease; }
+.step-item.active .step-circle { border-color: var(--accent); background: var(--accent); color: var(--accent-text); box-shadow: none; animation: none; }
+.step-item.completed .step-circle { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.step-label { margin-top: 8px; font-size: 13px; font-weight: 500; text-align: center; }
+.step-line { position: absolute; top: 16px; left: 50%; right: -50%; height: 1px; background: var(--border); z-index: 1; }
+.step-item.completed .step-line { background: var(--border-strong); }
+.step-item:last-child .step-line { display: none; }
+@keyframes pulse { 0%, 100% { box-shadow: none; } }
 
-      /* Shadow */
-      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
-      --shadow-md: 0 2px 4px rgba(0,0,0,0.04);
-      --shadow-lg: 0 4px 8px rgba(0,0,0,0.04);
+/* Dashboard */
+.dashboard { display: flex; flex-direction: column; align-items: center; padding: 24px 0; width: 100%; overflow: hidden; }
+.progress-ring { position: relative; width: 180px; height: 180px; display: flex; align-items: center; justify-content: center; }
+.progress-ring .el-progress { width: 180px; height: 180px; }
+.progress-ring .el-progress__text { display: flex !important; align-items: center !important; justify-content: center !important; width: 100% !important; height: 100% !important; top: 0 !important; left: 0 !important; transform: none !important; margin: 0 !important; }
+.progress-center { text-align: center; line-height: 1.3; }
+.progress-percent { font-size: 2rem; font-family: var(--font-mono); font-weight: 600; color: var(--text-primary); }
+.progress-step-name { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+.time-cards { display: flex; gap: 16px; margin-top: 24px; }
+.time-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 24px; text-align: center; min-width: 120px; }
+.time-card .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; font-weight: 500; }
+.time-card .value { font-family: var(--font-mono); font-size: 1.25rem; font-weight: 600; }
 
-      /* Font */
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-      --font-mono: 'Geist Mono', 'SF Mono', 'Fira Code', 'Courier New', monospace;
+/* Success / Error states */
+.success-card { border-color: var(--border); box-shadow: none; }
+.error-card { border-color: var(--danger); box-shadow: none; }
+.download-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 24px; }
+.download-item { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px; text-align: center; cursor: pointer; transition: all 0.15s ease; color: var(--text-primary); text-decoration: none; display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+.download-item:hover { border-color: var(--text-primary); background: var(--bg-tertiary); }
+.error-message { font-family: var(--font-mono); font-size: 13px; background: var(--bg-secondary); border: 1px solid var(--border); padding: 16px; border-radius: var(--radius-md); margin: 16px 0; white-space: pre-wrap; word-break: break-word; color: var(--danger); }
 
-      /* Legacy variable mappings (for inline style compatibility) */
-      --glass-bg: var(--surface);
-      --glass-border: var(--border);
-      --shadow-glass: var(--shadow-sm);
-      --accent-cyan: var(--text-primary);
-      --accent-blue: var(--link);
-    }
+/* History */
+.history-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.history-toolbar .history-status-tabs { display: flex; flex-wrap: wrap; flex-shrink: 0; }
+.history-toolbar .history-status-tabs .el-radio-button__inner { border-radius: 0; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-secondary); font-size: 13px; padding: 6px 14px; box-shadow: none; transition: all 0.15s ease; }
+.history-toolbar .history-status-tabs .el-radio-button:first-child .el-radio-button__inner { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.history-toolbar .history-status-tabs .el-radio-button:last-child .el-radio-button__inner { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.history-toolbar .history-status-tabs .el-radio-button__original-radio:checked + .el-radio-button__inner { background: var(--accent) !important; color: var(--accent-text) !important; border-color: var(--accent) !important; font-weight: 600; box-shadow: none !important; }
+.history-toolbar .history-status-tabs .el-radio-button__inner:hover { color: var(--text-primary); border-color: var(--text-primary); }
+.history-toolbar .history-search-input { width: 220px; flex: 1; max-width: 300px; min-width: 160px; }
+.history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-top: 0; }
+.history-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; transition: all 0.15s ease; }
+.history-card:hover { border-color: var(--border-strong); }
+.history-card .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.history-card .card-filename { font-weight: 600; font-size: 14px; word-break: break-word; padding-right: 20px; line-height: 1.4; color: var(--text-primary); }
+.history-card .card-status { flex-shrink: 0; margin-left: 10px; }
+.history-card .card-meta { display: flex; flex-wrap: wrap; gap: 12px; color: var(--text-secondary); font-size: 13px; margin-bottom: 16px; }
+.history-card .card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.history-card .card-actions .el-button { font-size: 12px; margin-left: 0; }
+.crop-list { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.crop-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); padding: 10px 12px; border-radius: var(--radius-md); font-size: 13px; border: 1px solid var(--border); }
+.crop-info { display: flex; align-items: center; gap: 10px; }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+/* Dialog */
+.el-overlay .el-dialog { background: var(--surface) !important; border: 1px solid var(--border); box-shadow: 0 4px 16px rgba(0,0,0,0.08); border-radius: var(--radius-xl); }
+.el-dialog__title { color: var(--text-primary) !important; font-weight: 600; font-size: 16px; }
+.el-dialog__body { color: var(--text-primary) !important; padding: 20px; }
+.el-dialog .el-input__wrapper { background: var(--bg-secondary) !important; box-shadow: none !important; border: 1px solid var(--border) !important; border-radius: var(--radius-md) !important; }
+.el-dialog .el-input__wrapper:hover, .el-dialog .el-input__wrapper.is-focus { border-color: var(--text-primary) !important; }
+.el-dialog .el-input__inner { color: var(--text-primary) !important; }
 
-    body {
-      font-family: var(--font-sans);
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      min-height: 100vh;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      line-height: 1.5;
-    }
+/* Config */
+.config-cards { display: flex; flex-direction: column; gap: 24px; }
+.config-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-sm); }
+.config-card h3 { font-size: 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-primary); }
+.config-card .el-divider { display: none; }
+.config-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; min-height: 40px; flex-wrap: wrap; gap: 8px; }
+.config-row .desc { font-size: 13px; color: var(--text-secondary); margin-left: 12px; flex: 1; }
+.config-row .el-form-item { margin-bottom: 0; }
 
-    #app { max-width: 1200px; margin: 0 auto; padding: 48px 24px; }
+/* Form elements */
+.el-input__wrapper { background: var(--bg-secondary); border-color: var(--border); box-shadow: none; border-radius: var(--radius-md); padding: 4px 12px; min-height: 36px; }
+.el-input__wrapper:hover, .el-input__wrapper.is-focus { border-color: var(--text-primary); box-shadow: 0 0 0 1px var(--text-primary); }
+.el-input__inner { color: var(--text-primary); font-size: 14px; }
+.el-select .el-input__wrapper { background: var(--bg-secondary); min-height: 36px; }
+.el-textarea__inner { background: var(--bg-secondary); border-color: var(--border); color: var(--text-primary); border-radius: var(--radius-md); padding: 8px 12px; }
+.el-textarea__inner:focus { border-color: var(--text-primary); box-shadow: 0 0 0 1px var(--text-primary); }
 
-    /* Header */
-    .app-header { text-align: center; margin-bottom: 48px; }
-    .app-header h1 { font-size: 32px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; letter-spacing: -0.02em; }
-    .app-header p { color: var(--text-secondary); font-size: 14px; font-weight: 400; }
+/* Fallback card */
+.fallback-card { background: var(--bg-secondary); border: 1px solid var(--border); padding: 16px; border-radius: var(--radius-md); margin-bottom: 12px; }
+.fallback-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 
-    /* Tabs - Override border-card to clean underline style */
-    .el-tabs { background: transparent; border: none; }
-    .el-tabs--border-card { background: transparent; border: none; box-shadow: none; }
-    .el-tabs--border-card > .el-tabs__content { padding: 0; }
-    .el-tabs__header { margin-bottom: 32px; background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 0; }
-    .el-tabs--border-card > .el-tabs__header { background: transparent; border: none; border-bottom: 1px solid var(--border); }
-    .el-tabs__nav { border: none; }
-    .el-tabs__item { color: var(--text-secondary) !important; border-radius: 0; transition: color 0.15s ease; height: 40px; line-height: 40px; margin: 0 24px 0 0; padding: 0 4px; font-weight: 500; font-size: 14px; border: none !important; }
-    .el-tabs--border-card > .el-tabs__header .el-tabs__item { border: none; color: var(--text-secondary); }
-    .el-tabs__item.is-active { color: var(--text-primary) !important; background: transparent; font-weight: 600; }
-    .el-tabs--border-card > .el-tabs__header .el-tabs__item.is-active { color: var(--text-primary); background: transparent; }
-    .el-tabs__active-bar { background: var(--accent); height: 2px; border-radius: 0; }
+/* Upload progress */
+.upload-progress-bar { margin-top: 16px; }
+.upload-progress-bar .el-progress__text { color: var(--text-secondary) !important; font-size: 12px !important; }
+.el-progress-bar__outer { background-color: var(--border); border-radius: var(--radius-sm); }
+.el-progress-bar__inner { background-color: var(--accent); border-radius: var(--radius-sm); }
+.el-progress__text { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
+.el-progress-circle__track { stroke: var(--border); }
+.el-progress-circle__path { stroke: var(--accent) !important; }
 
-    /* Cards */
-    .glass-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 24px; margin-bottom: 24px; transition: border-color 0.15s ease; }
-    .glass-card:hover { border-color: var(--border-strong); }
+/* Standard radio buttons (e.g. in dialog) */
+.el-radio-button__inner { border-radius: var(--radius-md) !important; border: 1px solid var(--border) !important; background: var(--bg-secondary) !important; color: var(--text-secondary) !important; box-shadow: none !important; font-weight: 500; padding: 8px 16px; transition: all 0.15s ease; }
+.el-radio-button__original-radio:checked + .el-radio-button__inner { background: var(--accent) !important; color: var(--accent-text) !important; border-color: var(--accent) !important; box-shadow: none !important; }
+.el-radio-button:first-child .el-radio-button__inner { border-radius: var(--radius-md) 0 0 var(--radius-md) !important; }
+.el-radio-button:last-child .el-radio-button__inner { border-radius: 0 var(--radius-md) var(--radius-md) 0 !important; }
 
-    /* Upload */
-    .upload-zone { border: 1px dashed var(--border); border-radius: var(--radius-lg); padding: 48px; text-align: center; transition: all 0.15s ease; cursor: pointer; background: var(--bg-secondary); }
-    .upload-zone:hover { border-color: var(--text-primary); background: var(--bg-tertiary); }
-    .upload-zone .el-upload-dragger { background: transparent; border: none; width: 100%; }
-    .upload-file-info { margin-top: 16px; color: var(--text-secondary); font-size: 14px; }
+/* Select dropdown */
+.el-select-dropdown { background-color: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: var(--radius-md) !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important; z-index: 9999 !important; }
 
-    .advanced-options-panel { margin-top: 12px; text-align: left; }
-    .subtitle-upload-box { margin-top: 12px; padding: 16px; border: 1px dashed var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); }
-    .subtitle-upload-box .el-upload-dragger { background: transparent; border: none; width: 100%; padding: 16px; }
-    .subtitle-success-hint { margin-top: 8px; font-size: 13px; color: var(--success); }
+/* Tags */
+.el-tag { border-radius: var(--radius-sm) !important; font-weight: 500; font-size: 12px; border: 1px solid var(--border); }
+.el-tag--dark { background: var(--bg-secondary) !important; border-color: var(--border) !important; color: var(--text-primary) !important; }
+.el-tag--dark.el-tag--success { color: var(--success) !important; }
+.el-tag--dark.el-tag--danger { color: var(--danger) !important; }
+.el-tag--dark.el-tag--warning { color: var(--warning) !important; }
+.el-tag--light { background: var(--bg-secondary) !important; border-color: var(--border) !important; }
+.el-tag--light.el-tag--success { color: var(--success) !important; }
+.el-tag--light.el-tag--danger { color: var(--danger) !important; }
+.el-tag--light.el-tag--warning { color: var(--warning) !important; }
 
-    /* Buttons */
-    .action-btn { width: 100%; background: var(--accent); border: 1px solid var(--accent); color: var(--accent-text); font-weight: 500; font-size: 14px; height: 44px; border-radius: var(--radius-md); transition: all 0.15s ease; letter-spacing: 0; box-shadow: none; }
-    .action-btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); transform: none; box-shadow: none; }
-    .action-btn.is-disabled { background: var(--bg-tertiary); border-color: var(--border); color: var(--text-disabled); box-shadow: none; }
+/* Alert */
+.el-alert { border-radius: var(--radius-md) !important; border: 1px solid var(--border); padding: 12px 16px; }
+.el-alert--info { background: var(--bg-secondary) !important; border-color: var(--border) !important; color: var(--text-secondary) !important; }
+.el-alert .el-alert__title { color: var(--text-primary) !important; font-weight: 500; font-size: 13px; }
+.el-alert .el-alert__description { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
 
-    /* Steps */
-    .step-timeline { display: flex; justify-content: space-between; margin: 32px 0; }
-    .step-item { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; color: var(--text-tertiary); transition: color 0.15s ease; }
-    .step-item.active { color: var(--text-primary); }
-    .step-item.completed { color: var(--text-primary); }
-    .step-circle { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-secondary); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; position: relative; z-index: 2; transition: all 0.15s ease; }
-    .step-item.active .step-circle { border-color: var(--accent); background: var(--accent); color: var(--accent-text); box-shadow: none; animation: none; }
-    .step-item.completed .step-circle { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-    .step-label { margin-top: 8px; font-size: 13px; font-weight: 500; text-align: center; }
-    .step-line { position: absolute; top: 16px; left: 50%; right: -50%; height: 1px; background: var(--border); z-index: 1; }
-    .step-item.completed .step-line { background: var(--border-strong); }
-    .step-item:last-child .step-line { display: none; }
+/* Switch */
+.el-switch__core { background: var(--border); border-color: var(--border); }
+.el-switch.is-checked .el-switch__core { background: var(--accent) !important; border-color: var(--accent) !important; }
+.el-switch__core .el-switch__action { background: #fff; }
 
-    @keyframes pulse { 0%, 100% { box-shadow: none; } }
+/* Slider */
+.el-slider__runway { background: var(--border); height: 4px; }
+.el-slider__bar { background: var(--accent); }
+.el-slider__button { border-color: var(--accent); background: #fff; width: 14px; height: 14px; }
+.el-slider__input { margin-top: 0; }
 
-    /* Dashboard */
-    .dashboard { display: flex; flex-direction: column; align-items: center; padding: 24px 0; width: 100%; overflow: hidden; }
-    .progress-ring { position: relative; width: 180px; height: 180px; display: flex; align-items: center; justify-content: center; }
-    .progress-ring .el-progress { width: 180px; height: 180px; }
-    .progress-ring .el-progress__text { display: flex !important; align-items: center !important; justify-content: center !important; width: 100% !important; height: 100% !important; top: 0 !important; left: 0 !important; transform: none !important; margin: 0 !important; }
-    .progress-center { text-align: center; line-height: 1.3; }
-    .progress-percent { font-size: 2rem; font-family: var(--font-mono); font-weight: 600; color: var(--text-primary); }
-    .progress-step-name { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
-    .time-cards { display: flex; gap: 16px; margin-top: 24px; }
-    .time-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 24px; text-align: center; min-width: 120px; }
-    .time-card .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; font-weight: 500; }
-    .time-card .value { font-family: var(--font-mono); font-size: 1.25rem; font-weight: 600; }
+/* Button system overrides */
+.el-button { border-radius: var(--radius-md) !important; font-weight: 500; transition: all 0.15s ease; padding: 8px 16px; font-size: 13px; }
+.el-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.el-button--primary { background: var(--accent) !important; border-color: var(--accent) !important; color: var(--accent-text) !important; }
+.el-button--primary:hover { background: var(--accent-hover) !important; border-color: var(--accent-hover) !important; }
+.el-button--primary.is-plain { background: var(--surface) !important; color: var(--text-primary) !important; border-color: var(--border) !important; }
+.el-button--primary.is-plain:hover { background: var(--bg-secondary) !important; border-color: var(--text-primary) !important; }
+.el-button--danger { background: var(--danger) !important; border-color: var(--danger) !important; color: #fff !important; }
+.el-button--danger:hover { background: #c00 !important; border-color: #c00 !important; }
+.el-button--danger.is-plain { background: var(--surface) !important; color: var(--danger) !important; border-color: var(--border) !important; }
+.el-button--danger.is-plain:hover { background: var(--bg-secondary) !important; border-color: var(--danger) !important; }
+.el-button--warning { background: var(--warning) !important; border-color: var(--warning) !important; color: #fff !important; }
+.el-button--warning.is-plain { background: var(--surface) !important; color: var(--warning) !important; border-color: var(--border) !important; }
+.el-button--warning.is-plain:hover { background: var(--bg-secondary) !important; border-color: var(--warning) !important; }
+.el-button--info { background: var(--bg-secondary) !important; border-color: var(--border) !important; color: var(--text-secondary) !important; }
+.el-button--info.is-text { border: none; background: transparent; color: var(--text-secondary); padding: 4px 8px; }
+.el-button--info.is-text:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.el-button--small { padding: 6px 12px; font-size: 12px; }
 
-    /* Success / Error states */
-    .success-card { border-color: var(--border); box-shadow: none; }
-    .error-card { border-color: var(--danger); box-shadow: none; }
-    .download-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 24px; }
-    .download-item { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px; text-align: center; cursor: pointer; transition: all 0.15s ease; color: var(--text-primary); text-decoration: none; display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
-    .download-item:hover { border-color: var(--text-primary); background: var(--bg-tertiary); }
-    .error-message { font-family: var(--font-mono); font-size: 13px; background: var(--bg-secondary); border: 1px solid var(--border); padding: 16px; border-radius: var(--radius-md); margin: 16px 0; white-space: pre-wrap; word-break: break-word; color: var(--danger); }
+/* Popconfirm / Popover */
+.el-popover { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+.el-popconfirm__main { color: var(--text-primary); font-size: 14px; }
 
-    /* History */
-    .history-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-    .history-toolbar .history-status-tabs { display: flex; flex-wrap: wrap; flex-shrink: 0; }
-    .history-toolbar .history-status-tabs .el-radio-button__inner { border-radius: 0; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-secondary); font-size: 13px; padding: 6px 14px; box-shadow: none; transition: all 0.15s ease; }
-    .history-toolbar .history-status-tabs .el-radio-button:first-child .el-radio-button__inner { border-radius: var(--radius-md) 0 0 var(--radius-md); }
-    .history-toolbar .history-status-tabs .el-radio-button:last-child .el-radio-button__inner { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
-    .history-toolbar .history-status-tabs .el-radio-button__original-radio:checked + .el-radio-button__inner { background: var(--accent) !important; color: var(--accent-text) !important; border-color: var(--accent) !important; font-weight: 600; box-shadow: none !important; }
-    .history-toolbar .history-status-tabs .el-radio-button__inner:hover { color: var(--text-primary); border-color: var(--text-primary); }
-    .history-toolbar .history-search-input { width: 220px; flex: 1; max-width: 300px; min-width: 160px; }
-    .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-top: 0; }
-    .history-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; transition: all 0.15s ease; }
-    .history-card:hover { border-color: var(--border-strong); }
-    .history-card .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-    .history-card .card-filename { font-weight: 600; font-size: 14px; word-break: break-word; padding-right: 20px; line-height: 1.4; color: var(--text-primary); }
-    .history-card .card-status { flex-shrink: 0; margin-left: 10px; }
-    .history-card .card-meta { display: flex; flex-wrap: wrap; gap: 12px; color: var(--text-secondary); font-size: 13px; margin-bottom: 16px; }
-    .history-card .card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .history-card .card-actions .el-button { font-size: 12px; margin-left: 0; }
-    .crop-list { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
-    .crop-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); padding: 10px 12px; border-radius: var(--radius-md); font-size: 13px; border: 1px solid var(--border); }
-    .crop-info { display: flex; align-items: center; gap: 10px; }
+/* Responsive - Tablet */
+@media (max-width: 1024px) {
+#app { padding: 32px 20px; max-width: 100%; }
+.app-header h1 { font-size: 28px; }
+.config-row { flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 20px; }
+.config-row .desc { margin-left: 0; margin-top: 4px; }
+.config-row .el-form-item, .config-row .el-input, .config-row .el-select, .config-row .el-slider { width: 100% !important; max-width: 100%; }
+.fallback-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+.history-grid { grid-template-columns: 1fr; }
+.download-grid { grid-template-columns: repeat(2, 1fr); }
+.time-cards { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+.upload-zone { padding: 32px 20px; }
+.glass-card { padding: 20px 16px; }
+.history-toolbar { gap: 10px; }
+.history-toolbar .history-status-tabs .el-radio-button__inner { padding: 5px 10px; font-size: 12px; }
+.history-toolbar .history-search-input { width: 180px; max-width: 100%; }
+.step-timeline { gap: 8px; }
+.step-item { min-width: 0; }
+.step-label { font-size: 12px; }
+.step-circle { width: 28px; height: 28px; font-size: 12px; }
+.step-line { top: 14px; }
+}
 
-    /* Dialog */
-    .el-overlay .el-dialog { background: var(--surface) !important; border: 1px solid var(--border); box-shadow: 0 4px 16px rgba(0,0,0,0.08); border-radius: var(--radius-xl); }
-    .el-dialog__title { color: var(--text-primary) !important; font-weight: 600; font-size: 16px; }
-    .el-dialog__body { color: var(--text-primary) !important; padding: 20px; }
-    .el-dialog .el-input__wrapper { background: var(--bg-secondary) !important; box-shadow: none !important; border: 1px solid var(--border) !important; border-radius: var(--radius-md) !important; }
-    .el-dialog .el-input__wrapper:hover, .el-dialog .el-input__wrapper.is-focus { border-color: var(--text-primary) !important; }
-    .el-dialog .el-input__inner { color: var(--text-primary) !important; }
-
-    /* Config */
-    .config-cards { display: flex; flex-direction: column; gap: 24px; }
-    .config-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-sm); }
-    .config-card h3 { font-size: 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-primary); }
-    .config-card .el-divider { display: none; }
-    .config-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; min-height: 40px; flex-wrap: wrap; gap: 8px; }
-    .config-row .desc { font-size: 13px; color: var(--text-secondary); margin-left: 12px; flex: 1; }
-    .config-row .el-form-item { margin-bottom: 0; }
-
-    /* Form elements */
-    .el-input__wrapper { background: var(--bg-secondary); border-color: var(--border); box-shadow: none; border-radius: var(--radius-md); padding: 4px 12px; min-height: 36px; }
-    .el-input__wrapper:hover, .el-input__wrapper.is-focus { border-color: var(--text-primary); box-shadow: 0 0 0 1px var(--text-primary); }
-    .el-input__inner { color: var(--text-primary); font-size: 14px; }
-    .el-select .el-input__wrapper { background: var(--bg-secondary); min-height: 36px; }
-    .el-textarea__inner { background: var(--bg-secondary); border-color: var(--border); color: var(--text-primary); border-radius: var(--radius-md); padding: 8px 12px; }
-    .el-textarea__inner:focus { border-color: var(--text-primary); box-shadow: 0 0 0 1px var(--text-primary); }
-
-    /* Fallback card */
-    .fallback-card { background: var(--bg-secondary); border: 1px solid var(--border); padding: 16px; border-radius: var(--radius-md); margin-bottom: 12px; }
-    .fallback-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-
-    /* Upload progress */
-    .upload-progress-bar { margin-top: 16px; }
-    .upload-progress-bar .el-progress__text { color: var(--text-secondary) !important; font-size: 12px !important; }
-    .el-progress-bar__outer { background-color: var(--border); border-radius: var(--radius-sm); }
-    .el-progress-bar__inner { background-color: var(--accent); border-radius: var(--radius-sm); }
-    .el-progress__text { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
-    .el-progress-circle__track { stroke: var(--border); }
-    .el-progress-circle__path { stroke: var(--accent) !important; }
-
-    /* Standard radio buttons (e.g. in dialog) */
-    .el-radio-button__inner { border-radius: var(--radius-md) !important; border: 1px solid var(--border) !important; background: var(--bg-secondary) !important; color: var(--text-secondary) !important; box-shadow: none !important; font-weight: 500; padding: 8px 16px; transition: all 0.15s ease; }
-    .el-radio-button__original-radio:checked + .el-radio-button__inner { background: var(--accent) !important; color: var(--accent-text) !important; border-color: var(--accent) !important; box-shadow: none !important; }
-    .el-radio-button:first-child .el-radio-button__inner { border-radius: var(--radius-md) 0 0 var(--radius-md) !important; }
-    .el-radio-button:last-child .el-radio-button__inner { border-radius: 0 var(--radius-md) var(--radius-md) 0 !important; }
-
-    /* Select dropdown */
-    .el-select-dropdown { background-color: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: var(--radius-md) !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important; z-index: 9999 !important; }
-
-    /* Tags */
-    .el-tag { border-radius: var(--radius-sm) !important; font-weight: 500; font-size: 12px; border: 1px solid var(--border); }
-    .el-tag--dark { background: var(--bg-secondary) !important; border-color: var(--border) !important; color: var(--text-primary) !important; }
-    .el-tag--dark.el-tag--success { color: var(--success) !important; }
-    .el-tag--dark.el-tag--danger { color: var(--danger) !important; }
-    .el-tag--dark.el-tag--warning { color: var(--warning) !important; }
-    .el-tag--light { background: var(--bg-secondary) !important; border-color: var(--border) !important; }
-    .el-tag--light.el-tag--success { color: var(--success) !important; }
-    .el-tag--light.el-tag--danger { color: var(--danger) !important; }
-    .el-tag--light.el-tag--warning { color: var(--warning) !important; }
-
-    /* Alert */
-    .el-alert { border-radius: var(--radius-md) !important; border: 1px solid var(--border); padding: 12px 16px; }
-    .el-alert--info { background: var(--bg-secondary) !important; border-color: var(--border) !important; color: var(--text-secondary) !important; }
-    .el-alert .el-alert__title { color: var(--text-primary) !important; font-weight: 500; font-size: 13px; }
-    .el-alert .el-alert__description { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
-
-    /* Switch */
-    .el-switch__core { background: var(--border); border-color: var(--border); }
-    .el-switch.is-checked .el-switch__core { background: var(--accent) !important; border-color: var(--accent) !important; }
-    .el-switch__core .el-switch__action { background: #fff; }
-
-    /* Slider */
-    .el-slider__runway { background: var(--border); height: 4px; }
-    .el-slider__bar { background: var(--accent); }
-    .el-slider__button { border-color: var(--accent); background: #fff; width: 14px; height: 14px; }
-    .el-slider__input { margin-top: 0; }
-
-    /* Button system overrides */
-    .el-button { border-radius: var(--radius-md) !important; font-weight: 500; transition: all 0.15s ease; padding: 8px 16px; font-size: 13px; }
-    .el-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    .el-button--primary { background: var(--accent) !important; border-color: var(--accent) !important; color: var(--accent-text) !important; }
-    .el-button--primary:hover { background: var(--accent-hover) !important; border-color: var(--accent-hover) !important; }
-    .el-button--primary.is-plain { background: var(--surface) !important; color: var(--text-primary) !important; border-color: var(--border) !important; }
-    .el-button--primary.is-plain:hover { background: var(--bg-secondary) !important; border-color: var(--text-primary) !important; }
-    .el-button--danger { background: var(--danger) !important; border-color: var(--danger) !important; color: #fff !important; }
-    .el-button--danger:hover { background: #c00 !important; border-color: #c00 !important; }
-    .el-button--danger.is-plain { background: var(--surface) !important; color: var(--danger) !important; border-color: var(--border) !important; }
-    .el-button--danger.is-plain:hover { background: var(--bg-secondary) !important; border-color: var(--danger) !important; }
-    .el-button--warning { background: var(--warning) !important; border-color: var(--warning) !important; color: #fff !important; }
-    .el-button--warning.is-plain { background: var(--surface) !important; color: var(--warning) !important; border-color: var(--border) !important; }
-    .el-button--warning.is-plain:hover { background: var(--bg-secondary) !important; border-color: var(--warning) !important; }
-    .el-button--info { background: var(--bg-secondary) !important; border-color: var(--border) !important; color: var(--text-secondary) !important; }
-    .el-button--info.is-text { border: none; background: transparent; color: var(--text-secondary); padding: 4px 8px; }
-    .el-button--info.is-text:hover { background: var(--bg-secondary); color: var(--text-primary); }
-    .el-button--small { padding: 6px 12px; font-size: 12px; }
-
-    /* Popconfirm / Popover */
-    .el-popover { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-    .el-popconfirm__main { color: var(--text-primary); font-size: 14px; }
-
-    /* Responsive - Tablet */
-    @media (max-width: 1024px) {
-      #app { padding: 32px 20px; max-width: 100%; }
-      .app-header h1 { font-size: 28px; }
-      .config-row { flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 20px; }
-      .config-row .desc { margin-left: 0; margin-top: 4px; }
-      .config-row .el-form-item, .config-row .el-input, .config-row .el-select, .config-row .el-slider { width: 100% !important; max-width: 100%; }
-      .fallback-header { flex-direction: column; align-items: flex-start; gap: 8px; }
-      .history-grid { grid-template-columns: 1fr; }
-      .download-grid { grid-template-columns: repeat(2, 1fr); }
-      .time-cards { flex-direction: row; flex-wrap: wrap; justify-content: center; }
-      .upload-zone { padding: 32px 20px; }
-      .glass-card { padding: 20px 16px; }
-      .history-toolbar { gap: 10px; }
-      .history-toolbar .history-status-tabs .el-radio-button__inner { padding: 5px 10px; font-size: 12px; }
-      .history-toolbar .history-search-input { width: 180px; max-width: 100%; }
-      .step-timeline { gap: 8px; }
-      .step-item { min-width: 0; }
-      .step-label { font-size: 12px; }
-      .step-circle { width: 28px; height: 28px; font-size: 12px; }
-      .step-line { top: 14px; }
-    }
-
-    /* Responsive - Mobile */
-    @media (max-width: 768px) {
-      #app { padding: 24px 16px; }
-      .time-cards { flex-direction: column; }
-      .history-grid { grid-template-columns: 1fr; }
-      .step-timeline { flex-direction: column; gap: 16px; }
-      .step-line { display: none; }
-      .app-header h1 { font-size: 24px; }
-      .download-grid { grid-template-columns: 1fr; }
-      .config-row { flex-direction: column; align-items: flex-start; gap: 8px; }
-      .history-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
-      .history-toolbar .history-status-tabs { width: 100%; justify-content: center; }
-      .history-toolbar .history-status-tabs .el-radio-button { flex: 1; }
-      .history-toolbar .history-status-tabs .el-radio-button__inner { width: 100%; border-radius: 0 !important; }
-      .history-toolbar .history-status-tabs .el-radio-button:first-child .el-radio-button__inner { border-radius: var(--radius-md) 0 0 var(--radius-md) !important; }
-      .history-toolbar .history-status-tabs .el-radio-button:last-child .el-radio-button__inner { border-radius: 0 var(--radius-md) var(--radius-md) 0 !important; }
-      .history-toolbar .history-search-input { width: 100% !important; max-width: 100%; }
-      .history-toolbar .el-button { width: 100%; }
-      .history-toolbar .el-popconfirm + .el-button, .history-toolbar .el-popconfirm { display: contents; }
-    }
-  </style>
-  <base target="_blank">
-  <base target="_blank">
+/* Responsive - Mobile */
+@media (max-width: 768px) {
+#app { padding: 24px 16px; }
+.time-cards { flex-direction: column; }
+.history-grid { grid-template-columns: 1fr; }
+.step-timeline { flex-direction: column; gap: 16px; }
+.step-line { display: none; }
+.app-header h1 { font-size: 24px; }
+.download-grid { grid-template-columns: 1fr; }
+.config-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+.history-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+.history-toolbar .history-status-tabs { width: 100%; justify-content: center; }
+.history-toolbar .history-status-tabs .el-radio-button { flex: 1; }
+.history-toolbar .history-status-tabs .el-radio-button__inner { width: 100%; border-radius: 0 !important; }
+.history-toolbar .history-status-tabs .el-radio-button:first-child .el-radio-button__inner { border-radius: var(--radius-md) 0 0 var(--radius-md) !important; }
+.history-toolbar .history-status-tabs .el-radio-button:last-child .el-radio-button__inner { border-radius: 0 var(--radius-md) var(--radius-md) 0 !important; }
+.history-toolbar .history-search-input { width: 100% !important; max-width: 100%; }
+.history-toolbar .el-button { width: 100%; }
+.history-toolbar .el-popconfirm + .el-button, .history-toolbar .el-popconfirm { display: contents; }
+}
+</style>
+<base target="_blank">
+<base target="_blank">
 </head>
 <body>
-  <div id="app">
-    <div class="app-header">
-      <h1>199 视频处理中枢</h1>
-      <p>AI 驱动的字幕生成 · 翻译 · 压制一站式流水线</p>
-    </div>
-
-    <el-tabs v-model="activeTab" type="border-card">
-      <!-- ==================== 主流程 ==================== -->
-      <el-tab-pane label="处理中心" name="main">
-        <div class="glass-card" v-if="!task">
-          <el-upload class="upload-zone" drag :auto-upload="false" :on-change="onFileChange" accept="video/*" :limit="1" v-model:file-list="fileList">
-            <div style="font-size: 32px; margin-bottom: 12px;">📁</div>
-            <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">拖拽视频文件到此处</div>
-            <div style="font-size: 13px; color: var(--text-secondary);">支持 MP4、WebM、MKV 等格式，或点击选择文件</div>
-          </el-upload>
-          <div class="upload-file-info" v-if="selectedFile">
-            已选择：{{ selectedFile.name }} ({{ formatFileSize(selectedFile.size) }})
-          </div>
-
-          <!-- 高级选项：上传字幕加速 -->
-          <div class="advanced-options-panel">
-            <el-button type="info" text @click="advancedCollapsed = !advancedCollapsed">
-              高级选项 {{ advancedCollapsed ? '▲' : '▼' }}
-            </el-button>
-            <div v-if="advancedCollapsed" class="subtitle-upload-box">
-              <el-upload drag :auto-upload="false" :on-change="onSubtitleChange" accept=".srt" :limit="1" v-model:file-list="subtitleFileList" style="width: 100%;">
-                <div style="font-size: 24px; margin-bottom: 8px;">📄</div>
-                <div style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">上传英文字幕</div>
-                <div style="font-size: 12px; color: var(--text-secondary);">已有英文字幕？上传即可跳过耗时语音识别（提速 80%）</div>
-              </el-upload>
-              <div v-if="subtitleFile" class="subtitle-success-hint">✓ 已选择字幕: {{ subtitleFile.name }}</div>
-            </div>
-          </div>
-
-          <!-- 分片上传进度 -->
-          <div class="upload-progress-bar" v-if="uploading && uploadChunkProgress.total > 0">
-            <el-progress :percentage="Math.round((uploadChunkProgress.uploaded / uploadChunkProgress.total) * 100)" :stroke-width="8" :format="() => '上传分片 ' + uploadChunkProgress.uploaded + '/' + uploadChunkProgress.total" />
-          </div>
-          <el-button class="action-btn" :disabled="!selectedFile || uploading" @click="uploadVideo" style="margin-top: 20px;">
-            {{ uploading ? '上传中...' : '开始处理' }}
-          </el-button>
-
-          <!-- 续传提示 -->
-          <div v-if="pendingUploads.length > 0 && !selectedFile && !uploading" style="margin-top: 16px; text-align: center;">
-            <el-alert type="info" :closable="false" style="margin-bottom: 12px;">
-              <template #title>发现 {{ pendingUploads.length }} 个未完成的上传</template>
-            </el-alert>
-            <div v-for="pu in pendingUploads" :key="pu.uploadId" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">
-              {{ pu.fileName }} ({{ formatFileSize(pu.fileSize) }})
-              <el-button type="danger" text size="small" @click="cancelPendingUpload(pu.uploadId)">取消</el-button>
-            </div>
-            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">
-              请重新选择相同文件，系统将自动跳过已上传部分
-            </div>
-          </div>
-        </div>
-
-        <!-- 处理中 / 完成 / 失败 状态 -->
-        <div v-if="task" :class="['glass-card', task.status === 'success' ? 'success-card' : '', task.status === 'failed' ? 'error-card' : '']">
-          <div class="step-timeline" v-if="task.status === 'processing' || task.status === 'pending'">
-            <div v-for="(step, idx) in steps" :key="idx" :class="['step-item', { active: step.active, completed: step.completed }]">
-              <div class="step-circle">{{ step.completed ? '✓' : idx + 1 }}</div>
-              <div class="step-label">{{ step.label }}</div>
-              <div class="step-line"></div>
-            </div>
-          </div>
-          <div v-if="task.status === 'processing' || task.status === 'pending'" class="dashboard">
-            <div class="progress-ring">
-              <el-progress type="circle" :percentage="Math.round(task.step_progress || 0)" :stroke-width="12" :width="180" color="url(#gradient)">
-                <template #default>
-                  <div class="progress-center">
-                    <div class="progress-percent">{{ Math.round(task.step_progress || 0) }}%</div>
-                    <div class="progress-step-name">{{ task.current_step || '准备中' }}</div>
-                    <div v-if="skippedWhisper" style="font-size: 12px; color: var(--success); margin-top: 4px;">⚡ 检测到外部字幕，已跳过语音识别</div>
-                  </div>
-                </template>
-              </el-progress>
-              <svg width="0" height="0">
-                <defs>
-                  <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stop-color="#06b6d4" />
-                    <stop offset="100%" stop-color="#3b82f6" />
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-            <div class="time-cards">
-              <div class="time-card">
-                <div class="label">已用时间</div>
-                <div class="value">{{ formatTime(elapsedSec) }}</div>
-              </div>
-              <div class="time-card">
-                <div class="label">预计剩余</div>
-                <div class="value">{{ etaSec != null && etaSec > 0 ? formatTime(etaSec) : '--:--' }}</div>
-              </div>
-            </div>
-          </div>
-          <div v-if="task.status === 'success'">
-            <div style="text-align: center; padding: 20px 0;">
-              <div style="font-size: 48px;">✅</div>
-              <h2 style="margin: 10px 0; color: var(--success);">处理成功！</h2>
-              <p style="color: var(--text-secondary);">你的视频已处理完毕，请下载文件</p>
-            </div>
-            <div class="download-grid">
-              <a :href="'/api/download/' + task.task_id + '/video'" class="download-item" v-if="task.download_urls && task.download_urls.video">
-                <span style="font-size: 28px;">🎬</span><span>压制视频</span>
-              </a>
-              <a :href="'/api/download/' + task.task_id + '/zh_srt'" class="download-item" v-if="task.download_urls && task.download_urls.zh_srt">
-                <span style="font-size: 28px;">🇨🇳</span><span>中文字幕</span>
-              </a>
-              <a :href="'/api/download/' + task.task_id + '/en_srt'" class="download-item" v-if="task.download_urls && task.download_urls.en_srt">
-                <span style="font-size: 28px;">🇬🇧</span><span>英文字幕</span>
-              </a>
-              <a :href="'/api/download/' + task.task_id + '/meta'" class="download-item" v-if="task.download_urls && task.download_urls.meta">
-                <span style="font-size: 28px;">📄</span><span>元数据</span>
-              </a>
-            </div>
-            <div style="text-align: center; margin-top: 24px;">
-              <el-button @click="resetMain" type="info" text>处理另一个视频</el-button>
-            </div>
-          </div>
-          <div v-if="task.status === 'failed'">
-            <div style="text-align: center; padding: 20px 0;">
-              <div style="font-size: 48px;">❌</div>
-              <h2 style="margin: 10px 0; color: var(--danger);">处理失败</h2>
-            </div>
-            <div class="error-message">{{ task.error_message }}</div>
-            <div style="text-align: center;">
-              <el-button @click="resetMain" type="primary">重新上传</el-button>
-            </div>
-          </div>
-        </div>
-      </el-tab-pane>
-
-      <!-- ==================== 历史记录 ==================== -->
-      <el-tab-pane label="任务历史" name="history">
-        <div class="glass-card">
-          <div class="history-toolbar">
-            <el-radio-group v-model="historyFilter.status" @change="fetchHistory" class="history-status-tabs" size="small">
-              <el-radio-button label="">全部</el-radio-button>
-              <el-radio-button label="pending">准备中</el-radio-button>
-              <el-radio-button label="processing">处理中</el-radio-button>
-              <el-radio-button label="success">成功</el-radio-button>
-              <el-radio-button label="failed">失败</el-radio-button>
-            </el-radio-group>
-            <el-input v-model="historyFilter.search" placeholder="搜索文件名..." clearable @input="onSearchInput" @clear="fetchHistory" class="history-search-input" />
-            <el-button @click="fetchHistory" type="primary" plain>刷新</el-button>
-            <el-popconfirm title="确定清除所有已完成和失败的任务？" @confirm="cleanupCompleted">
-              <template #reference>
-                <el-button type="danger" plain>一键清理</el-button>
-              </template>
-            </el-popconfirm>
-          </div>
-          <div class="history-grid">
-            <div v-for="item in filteredHistoryTasks" :key="item.task_id" class="history-card">
-              <div class="card-header">
-                <div class="card-filename" :title="item.original_filename">
-                  {{ item.original_filename || item.task_id }}
-                </div>
-                <div class="card-status">
-                  <el-tag :type="item.status === 'success' ? 'success' : item.status === 'failed' ? 'danger' : 'warning'" size="small" effect="dark">
-                    {{ item.status === 'success' ? '成功' : item.status === 'failed' ? '失败' : item.status === 'pending' ? '准备中' : '处理中' }}
-                  </el-tag>
-                </div>
-              </div>
-              <div class="card-meta">
-                <span>{{ formatDate(item.created_at) }}</span>
-                <span v-if="item.file_size">{{ formatFileSize(item.file_size) }}</span>
-              </div>
-              <div class="card-actions">
-                <template v-if="item.status === 'success'">
-                  <el-button size="small" @click="downloadHistoryFile(item.task_id, 'video')" v-if="item.output_video_path">🎬 原版</el-button>
-                  <el-button size="small" @click="downloadHistoryFile(item.task_id, 'zh_srt')" v-if="item.output_zh_srt">🇨🇳 中字</el-button>
-                  <el-button size="small" @click="downloadHistoryFile(item.task_id, 'en_srt')" v-if="item.output_en_srt">🇬🇧 英字</el-button>
-                  <el-button size="small" @click="downloadHistoryFile(item.task_id, 'meta')" v-if="item.output_meta">📄 元数据</el-button>
-                  <el-button size="small" type="primary" plain @click="openCropDialog(item.task_id)">✂️ 裁剪</el-button>
-                </template>
-                <el-button size="small" type="warning" plain @click="reprocessTask(item.task_id)" v-if="item.status === 'success' || item.status === 'failed'">
-                  重新制作
-                </el-button>
-                <el-button size="small" type="danger" @click="deleteTask(item.task_id)">删除</el-button>
-                <el-button size="small" type="info" text @click="toggleCrops(item)" v-if="item.status === 'success'" style="margin-left: auto;">
-                  {{ item.showCrops ? '收起裁剪版 ▲' : '查看裁剪版 ▼' }}
-                </el-button>
-              </div>
-              <div v-if="item.showCrops" class="crop-list">
-                <div v-if="!item.cropsLoaded" style="font-size:12px; color:var(--text-secondary);">加载中...</div>
-                <div v-else-if="item.crops.length === 0" style="font-size:12px; color:var(--text-secondary);">暂无裁剪记录</div>
-                <div v-else v-for="crop in item.crops" :key="crop.crop_id" class="crop-item">
-                  <div class="crop-info">
-                    <span>裁剪片段数: {{ crop.segments ? crop.segments.length : 0 }}</span>
-                    <el-tag :type="crop.status === 'success' ? 'success' : crop.status === 'failed' ? 'danger' : 'warning'" size="small">
-                      {{ crop.status === 'success' ? '成功' : crop.status === 'failed' ? '失败' : '处理中' }}
-                    </el-tag>
-                  </div>
-                  <div class="crop-action">
-                    <el-button v-if="crop.status === 'success'" size="small" type="primary" link @click="downloadCropFile(crop.crop_id)">下载</el-button>
-                    <div v-if="crop.status === 'failed'" style="font-size: 12px; color: var(--danger);" :title="crop.error_message">失败详情</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-if="filteredHistoryTasks.length === 0" style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">
-              暂无历史任务
-            </div>
-          </div>
-        </div>
-      </el-tab-pane>
-
-      <!-- ==================== 配置 ==================== -->
-      <el-tab-pane label="系统配置" name="config">
-        <div class="config-cards">
-          <div class="config-card">
-            <h3>功能开关</h3>
-            <div class="config-row">
-              <span>ASR 提示词生成</span>
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <span class="desc">基于标题预测专有名词，提高识别准确率</span>
-                <el-switch v-model="configForm.features.enable_asr_prompt" />
-              </div>
-            </div>
-            <div class="config-row">
-              <span>广告检测</span>
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <span class="desc">自动识别并标记广告片段</span>
-                <el-switch v-model="configForm.features.enable_ad_detection" />
-              </div>
-            </div>
-            <div class="config-row">
-              <span>内容摘要</span>
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <span class="desc">生成视频内容中文摘要</span>
-                <el-switch v-model="configForm.features.enable_summary" />
-              </div>
-            </div>
-            <div class="config-row">
-              <span>推荐标题</span>
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <span class="desc">生成 5 个吸引人的中文标题</span>
-                <el-switch v-model="configForm.features.enable_titles" />
-              </div>
-            </div>
-          </div>
-
-          <div class="config-card">
-            <h3>模型设置</h3>
-            <div class="config-row"><span>分析模型</span><el-input v-model="configForm.ollama.analysis.model" style="width: 200px;" /></div>
-            <div class="config-row"><span>分析温度</span><el-slider v-model="configForm.ollama.analysis.temperature" :min="0" :max="1" :step="0.05" show-input style="width: 200px;" /></div>
-            <div class="config-row"><span>翻译模型</span><el-input v-model="configForm.ollama.translate.model" style="width: 200px;" /></div>
-            <div class="config-row"><span>翻译温度</span><el-slider v-model="configForm.ollama.translate.temperature" :min="0" :max="1" :step="0.05" show-input style="width: 200px;" /></div>
-          </div>
-
-          <div class="config-card">
-            <h3>翻译后端</h3>
-            <div class="config-row">
-              <span>翻译方式</span>
-              <el-select v-model="configForm.translate_backend" style="width: 200px;">
-                <el-option label="Ollama (本地模型)" value="ollama" />
-                <el-option label="本地 Transformers (HY-MT1.5)" value="local_transformers" />
-                <el-option label="在线 API (OpenAI 兼容)" value="online_api" />
-              </el-select>
-            </div>
-            <template v-if="configForm.translate_backend === 'online_api'">
-              <div class="config-row"><span>API 地址</span><el-input v-model="configForm.online_api.base_url" placeholder="https://api.openai.com" style="width: 300px;" /></div>
-              <div class="config-row"><span>API 密钥</span><el-input v-model="configForm.online_api.api_key" type="password" show-password placeholder="sk-..." style="width: 300px;" /></div>
-              <div class="config-row"><span>模型名称</span><el-input v-model="configForm.online_api.model" placeholder="gpt-3.5-turbo / deepseek-chat" style="width: 200px;" /></div>
-              <div class="config-row">
-                <span>翻译模式</span>
-                <el-select v-model="configForm.online_api.batch_mode" style="width: 150px;">
-                  <el-option label="逐句翻译（稳定）" :value="false" />
-                  <el-option label="批量翻译（快速）" :value="true" />
-                </el-select>
-              </div>
-              <div class="config-row" v-if="configForm.online_api.batch_mode"><span>每批句数</span><el-slider v-model="configForm.online_api.batch_size" :min="1" :max="20" :step="1" show-input style="width: 200px;" /></div>
-              
-              <div style="margin-top: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                  <span style="font-weight: 600; font-size: 15px;">备用 API（额度耗尽时自动切换）</span>
-                  <el-button type="primary" plain size="small" @click="addFallback">+ 添加备用</el-button>
-                </div>
-                <div v-for="(fb, idx) in (configForm.online_api.fallbacks || [])" :key="idx" class="fallback-card">
-                  <div class="fallback-header">
-                    <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">备用 API {{ idx + 1 }}</span>
-                    <el-button type="danger" plain size="small" @click="removeFallback(idx)">移除</el-button>
-                  </div>
-                  <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <div class="config-row"><span>名称</span><el-input v-model="fb.name" placeholder="备用1" style="width: 200px;" /></div>
-                    <div class="config-row"><span>API 地址</span><el-input v-model="fb.base_url" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" style="width: 300px;" /></div>
-                    <div class="config-row"><span>API 密钥</span><el-input v-model="fb.api_key" type="password" show-password placeholder="sk-..." style="width: 300px;" /></div>
-                    <div class="config-row"><span>模型名称</span><el-input v-model="fb.model" placeholder="qwen-turbo" style="width: 200px;" /></div>
-                  </div>
-                </div>
-                <div v-if="!configForm.online_api.fallbacks || configForm.online_api.fallbacks.length === 0" style="font-size: 13px; color: var(--text-secondary); text-align: center; padding: 12px;">
-                  暂无备用 API，主 API 额度耗尽时任务将失败
-                </div>
-              </div>
-            </template>
-            <div class="config-row" v-if="configForm.translate_backend === 'local_transformers'"><span>模型路径</span><el-input v-model="configForm.local_translation.model_dir" placeholder="E:\modelscope\..." style="width: 300px;" /></div>
-            <div class="config-row" v-if="configForm.translate_backend === 'local_transformers'">
-              <span>视频主题</span>
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <el-select v-model="topicPreset" @change="onTopicChange" style="width: 150px;">
-                  <el-option label="无主题" value="" />
-                  <el-option label="足球" value="football" />
-                  <el-option label="F1赛车" value="f1" />
-                  <el-option label="篮球" value="basketball" />
-                  <el-option label="电竞" value="esports" />
-                  <el-option label="自定义" value="custom" />
-                </el-select>
-                <el-input v-if="topicPreset === 'custom'" v-model="configForm.local_translation.topic" placeholder="英文主题，如 football tactical analysis" style="width: 220px;" />
-              </div>
-            </div>
-          </div>
-
-          <div class="config-card">
-            <h3>字幕样式</h3>
-            <div class="config-row"><span>中文字体</span><el-input v-model="configForm.font.zh" style="width: 200px;" /></div>
-            <div class="config-row"><span>英文字体</span><el-input v-model="configForm.font.en" style="width: 200px;" /></div>
-            <div class="config-row"><span>字体缩放</span><el-slider v-model="configForm.font.scale" :min="0.8" :max="1.5" :step="0.05" show-input style="width: 200px;" /></div>
-          </div>
-
-          <el-button type="primary" @click="saveConfig" size="large" style="align-self: flex-end;">
-            {{ configSaved ? '已保存' : '保存配置' }}
-          </el-button>
-        </div>
-      </el-tab-pane>
-    </el-tabs>
-
-    <!-- 裁剪对话框 -->
-    <el-dialog v-model="cropDialogVisible" title="视频片段裁剪" width="520px">
-      <el-radio-group v-model="cropMode" style="margin-bottom: 16px; display: flex;">
-        <el-radio-button label="remove">删除片段（去掉广告）</el-radio-button>
-        <el-radio-button label="keep">保留片段（拼接精华）</el-radio-button>
-      </el-radio-group>
-      <div style="margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
-        <template v-if="cropMode === 'remove'">
-          请输入你要<strong style="color:var(--danger)">删除</strong>的视频片段（如广告段）。<br>
-          系统会自动保留剩余内容，无缝拼接成新视频。
-        </template>
-        <template v-else>
-          请输入你要<strong style="color:var(--accent-cyan)">保留</strong>的视频片段。<br>
-          最终会将所有保留段按照顺序拼接到一起。
-        </template>
-      </div>
-      <div v-for="(seg, idx) in cropSegments" :key="idx" style="background: var(--bg-secondary); border: 1px solid var(--border); padding: 16px; border-radius: var(--radius-md); margin-bottom: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">{{ cropMode === 'remove' ? '删除段' : '保留段' }} {{ idx + 1 }}</span>
-          <el-button type="danger" plain size="small" @click="removeCropSegment(idx)" :disabled="cropSegments.length <= 1">移除</el-button>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <div>
-            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">起始时间（如 00:03:04）</div>
-            <el-input v-model="seg.start" placeholder="00:03:04" size="large" />
-          </div>
-          <div>
-            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">结束时间（如 00:04:08）</div>
-            <el-input v-model="seg.end" placeholder="00:04:08" size="large" />
-          </div>
-        </div>
-      </div>
-      <el-button type="primary" plain size="small" @click="addCropSegment" style="width: 100%; margin-top: 6px; border-style: dashed;">
-        + 添加{{ cropMode === 'remove' ? '删除' : '保留' }}时间段
-      </el-button>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="cropDialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="cropSubmitting" @click="submitCrop">提交裁剪后台任务</el-button>
-        </span>
-      </template>
-    </el-dialog>
-  </div>
-
-  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-  <script src="https://unpkg.com/element-plus"></script>
-  <script>
-    const { createApp, ref, reactive, computed, onMounted, onUnmounted } = Vue;
-
-    /* ========== IndexedDB 辅助：存储上传状态，用于断点续传 ========== */
-    const uploadDB = {
-      db: null,
-      async init() {
-        return new Promise((resolve) => {
-          const request = indexedDB.open('SubtitleFlowUploads', 1);
-          request.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains('pending_uploads')) {
-              db.createObjectStore('pending_uploads', { keyPath: 'uploadId' });
-            }
-          };
-          request.onsuccess = (e) => { this.db = e.target.result; resolve(); };
-          request.onerror = () => { console.warn('IndexedDB 不可用，断点续传功能关闭'); resolve(); };
-        });
-      },
-      async save(state) {
-        if (!this.db) return;
-        try {
-          const tx = this.db.transaction('pending_uploads', 'readwrite');
-          tx.objectStore('pending_uploads').put(state);
-        } catch (e) { console.warn('IDB save fail', e); }
-      },
-      async get(uploadId) {
-        if (!this.db) return null;
-        try {
-          const tx = this.db.transaction('pending_uploads', 'readonly');
-          const req = tx.objectStore('pending_uploads').get(uploadId);
-          return new Promise((r) => { req.onsuccess = () => r(req.result || null); req.onerror = () => r(null); });
-        } catch (e) { return null; }
-      },
-      async getAll() {
-        if (!this.db) return [];
-        try {
-          const tx = this.db.transaction('pending_uploads', 'readonly');
-          const req = tx.objectStore('pending_uploads').getAll();
-          return new Promise((r) => { req.onsuccess = () => r(req.result || []); req.onerror = () => r([]); });
-        } catch (e) { return []; }
-      },
-      async remove(uploadId) {
-        if (!this.db) return;
-        try {
-          const tx = this.db.transaction('pending_uploads', 'readwrite');
-          tx.objectStore('pending_uploads').delete(uploadId);
-        } catch (e) { console.warn('IDB remove fail', e); }
-      }
-    };
-
-    const CHUNK_SIZE = 5 * 1024 * 1024;
-    const CHUNK_THRESHOLD = 5 * 1024 * 1024;
-
-    const app = createApp({
-      setup() {
-        const activeTab = ref('main');
-        const fileList = ref([]);
-        const selectedFile = ref(null);
-        const uploading = ref(false);
-        const task = ref(null);
-        const elapsedSec = ref(0);
-        const etaSec = ref(null);
-        let pollingTimer = null;
-        let elapsedTimer = null;
-        let stepStartTime = null;
-        let isUploadingFlag = false;
-
-        const uploadChunkProgress = reactive({ uploaded: 0, total: 0 });
-        const pendingUploads = ref([]);
-
-        // 新增：高级选项与字幕上传状态
-        const advancedCollapsed = ref(false);
-        const subtitleFile = ref(null);
-        const subtitleFileList = ref([]);
-        const skippedWhisper = ref(false);
-
-        const steps = reactive([
-          { label: '格式转换', active: false, completed: false },
-          { label: '生成提示词', active: false, completed: false },
-          { label: '语音识别', active: false, completed: false },
-          { label: '分析与翻译', active: false, completed: false },
-          { label: '字幕压制', active: false, completed: false },
-        ]);
-
-        const onFileChange = (file) => {
-          selectedFile.value = file.raw;
-          fileList.value = [file];
-        };
-
-        const onSubtitleChange = (file) => {
-          subtitleFile.value = file.raw;
-          subtitleFileList.value = [file];
-        };
-
-        /* ========== 上传逻辑 ========== */
-        const uploadVideo = async () => {
-          if (!selectedFile.value) return;
-          uploading.value = true;
-          isUploadingFlag = true;
-          uploadChunkProgress.uploaded = 0;
-          uploadChunkProgress.total = 0;
-          try {
-            const file = selectedFile.value;
-            if (file.size >= CHUNK_THRESHOLD) {
-              await chunkedUpload(file);
-            } else {
-              await simpleUpload(file);
-            }
-          } catch (e) {
-            ElementPlus.ElMessage.error('上传失败: ' + e.message);
-          } finally {
-            uploading.value = false;
-            isUploadingFlag = false;
-            uploadChunkProgress.uploaded = 0;
-            uploadChunkProgress.total = 0;
-          }
-        };
-
-        const simpleUpload = async (file) => {
-          const formData = new FormData();
-          formData.append('file', file);
-          if (subtitleFile.value) {
-            formData.append('subtitle', subtitleFile.value);
-          }
-          const res = await fetch('/api/upload', { method: 'POST', body: formData });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.detail || '上传失败');
-          task.value = { task_id: data.task_id, status: 'processing', step_progress: 0, current_step: '准备开始' };
-          startPolling(data.task_id);
-        };
-
-        const chunkedUpload = async (file) => {
-          const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-          let uploadId = null;
-          let startChunk = 0;
-
-          const allPending = await uploadDB.getAll();
-          const matching = allPending.find(p => p.fileName === file.name && p.fileSize === file.size);
-          if (matching) {
-            try {
-              const statusRes = await fetch('/api/upload/status/' + matching.uploadId);
-              if (statusRes.ok) {
-                const statusData = await statusRes.json();
-                if (statusData.status === 'uploading') {
-                  uploadId = matching.uploadId;
-                  const uploaded = statusData.uploaded_chunks || [];
-                  startChunk = uploaded.length > 0 ? Math.max(...uploaded) + 1 : 0;
-                  if (startChunk >= totalChunks) startChunk = totalChunks;
-                  console.log('[upload] 续传: 从分片 ' + startChunk + '/' + totalChunks + ' 开始');
-                }
-              }
-            } catch (e) { }
-          }
-
-          if (!uploadId) {
-            const initRes = await fetch('/api/upload/init', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ filename: file.name, file_size: file.size, total_chunks: totalChunks })
-            });
-            const initData = await initRes.json();
-            if (!initRes.ok) throw new Error(initData.detail || '初始化上传失败');
-            uploadId = initData.upload_id;
-            startChunk = 0;
-          }
-
-          await uploadDB.save({ uploadId, fileName: file.name, fileSize: file.size, totalChunks, timestamp: Date.now() });
-          uploadChunkProgress.total = totalChunks;
-          uploadChunkProgress.uploaded = startChunk;
-
-          for (let i = startChunk; i < totalChunks; i++) {
-            const start = i * CHUNK_SIZE;
-            const end = Math.min(start + CHUNK_SIZE, file.size);
-            const chunkBlob = file.slice(start, end);
-            const formData = new FormData();
-            formData.append('chunk', chunkBlob);
-            const chunkRes = await fetch('/api/upload/chunk?upload_id=' + uploadId + '&chunk_index=' + i, { method: 'POST', body: formData });
-            if (!chunkRes.ok) {
-              const errData = await chunkRes.json().catch(() => ({}));
-              throw new Error(errData.detail || '分片 ' + i + ' 上传失败');
-            }
-            uploadChunkProgress.uploaded = i + 1;
-            await uploadDB.save({ uploadId, fileName: file.name, fileSize: file.size, totalChunks, timestamp: Date.now() });
-          }
-
-          const hasSub = !!subtitleFile.value;
-          const completeRes = await fetch('/api/upload/complete?upload_id=' + uploadId + '&has_subtitle=' + hasSub, { method: 'POST' });
-          const completeData = await completeRes.json();
-          if (!completeRes.ok) throw new Error(completeData.detail || '完成上传失败');
-
-          await uploadDB.remove(uploadId);
-
-          // 如果有字幕，在视频分片合并完成后单独上传字幕，此时后端会自动触发流水线
-          if (hasSub) {
-            const subFormData = new FormData();
-            subFormData.append('subtitle', subtitleFile.value);
-            const subRes = await fetch('/api/upload/subtitle?task_id=' + completeData.task_id, {
-              method: 'POST',
-              body: subFormData
-            });
-            if (!subRes.ok) {
-              const errSub = await subRes.json().catch(() => ({}));
-              throw new Error(errSub.detail || '字幕上传失败');
-            }
-          }
-
-          task.value = { task_id: completeData.task_id, status: 'processing', step_progress: 0, current_step: '准备开始' };
-          startPolling(completeData.task_id);
-          await loadPendingUploads();
-        };
-
-        const cancelPendingUpload = async (uploadId) => {
-          await uploadDB.remove(uploadId);
-          await loadPendingUploads();
-        };
-
-        const loadPendingUploads = async () => {
-          const all = await uploadDB.getAll();
-          pendingUploads.value = all.map(p => ({ uploadId: p.uploadId, fileName: p.fileName, fileSize: p.fileSize }));
-        };
-
-        /* ========== 轮询 ========== */
-        const startPolling = (taskId) => {
-          stopPolling();
-          pollingTimer = setInterval(async () => {
-            try {
-              const res = await fetch('/api/task/' + taskId);
-              const t = await res.json();
-              if (!res.ok) throw new Error(t.detail);
-              task.value = t;
-              updateSteps(t.current_step);
-              if (t.step_started_at) {
-                stepStartTime = new Date(t.step_started_at + 'Z').getTime();
-                startElapsedTimer(stepStartTime);
-              }
-              etaSec.value = t.eta_sec ?? null;
-              if (t.status === 'success' || t.status === 'failed') {
-                stopPolling();
-                stopElapsedTimer();
-                fetchHistory();
-              }
-            } catch (e) {
-              console.error('轮询出错', e);
-            }
-          }, 1500);
-        };
-
-        const stopPolling = () => { if (pollingTimer) clearInterval(pollingTimer); };
-        const stopElapsedTimer = () => { if (elapsedTimer) clearInterval(elapsedTimer); };
-
-        const updateSteps = (current) => {
-          const map = { '格式转换': 0, '生成ASR提示词': 1, '语音识别': 2, '分析与翻译': 3, '压制字幕': 4 };
-          const idx = map[current];
-
-          // 检测是否跳过了语音识别
-          if (current === '分析与翻译' && !steps[2].completed) {
-            skippedWhisper.value = true;
-            steps[0].completed = true;
-            steps[1].completed = true;
-            steps[2].active = false;
-            steps[2].completed = true;
-            steps[3].active = true;
-          } else {
-            skippedWhisper.value = false;
-            steps.forEach((s, i) => {
-              s.active = (i === idx);
-              s.completed = (i < idx);
-            });
-          }
-
-          if (!current || current === '完成' || current === '全部完成') {
-            steps.forEach(s => { s.active = false; s.completed = true; });
-          }
-        };
-
-        const startElapsedTimer = (startTs) => {
-          stopElapsedTimer();
-          elapsedTimer = setInterval(() => {
-            elapsedSec.value = (Date.now() - startTs) / 1000;
-          }, 200);
-        };
-
-        /* ========== 工具函数 ========== */
-        const formatTime = (sec) => {
-          if (sec == null || isNaN(sec)) return '--:--';
-          const m = Math.floor(sec / 60);
-          const s = Math.floor(sec % 60);
-          return m.toString().padStart(2, '0') + ':' + s.toString().padStart(2, '0');
-        };
-
-        const formatFileSize = (bytes) => {
-          if (!bytes) return '0 B';
-          const k = 1024;
-          const sizes = ['B', 'KB', 'MB', 'GB'];
-          const i = Math.floor(Math.log(bytes) / Math.log(k));
-          return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        };
-
-        const formatDate = (dateStr) => {
-          if (!dateStr) return '-';
-          const normalized = dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr) ? dateStr : dateStr + 'Z';
-          const date = new Date(normalized);
-          if (isNaN(date.getTime())) return '-';
-          return date.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        };
-
-        const resetMain = () => {
-          task.value = null;
-          fileList.value = [];
-          selectedFile.value = null;
-          elapsedSec.value = 0;
-          etaSec.value = null;
-          skippedWhisper.value = false;
-          advancedCollapsed.value = false;
-          subtitleFile.value = null;
-          subtitleFileList.value = [];
-          steps.forEach(s => { s.active = false; s.completed = false; });
-        };
-
-        /* ========== 历史记录 ========== */
-        const historyTasks = ref([]);
-        const historyFilter = reactive({ status: '', search: '' });
-        let debounceTimer = null;
-        const onSearchInput = () => {
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => { fetchHistory(); }, 500);
-        };
-
-        const filteredHistoryTasks = computed(() => { return historyTasks.value; });
-
-        const fetchHistory = async () => {
-          try {
-            const params = new URLSearchParams();
-            if (historyFilter.status) params.append('status', historyFilter.status);
-            if (historyFilter.search) params.append('search', historyFilter.search);
-            params.append('page', '1');
-            params.append('page_size', '1000');
-            const res = await fetch('/api/tasks?' + params.toString());
-            const data = await res.json();
-            if (res.ok) {
-              historyTasks.value = (data.tasks || []).map(item => ({ ...item, showCrops: false, cropsLoaded: false, crops: [] }));
-            }
-          } catch (e) {
-            ElementPlus.ElMessage.error('获取历史失败: ' + e.message);
-          }
-        };
-
-        const deleteTask = async (taskId) => {
-          try {
-            const res = await fetch('/api/tasks/' + taskId, { method: 'DELETE' });
-            if (res.ok) { fetchHistory(); ElementPlus.ElMessage.success('删除成功'); }
-            else throw new Error('删除失败');
-          } catch (e) { ElementPlus.ElMessage.error('删除失败: ' + e.message); }
-        };
-
-        const cleanupCompleted = async () => {
-          try {
-            const res = await fetch('/api/tasks/cleanup', { method: 'POST' });
-            if (res.ok) { fetchHistory(); ElementPlus.ElMessage.success('清理完成'); }
-            else throw new Error('清理失败');
-          } catch (e) { ElementPlus.ElMessage.error('清理失败: ' + e.message); }
-        };
-
-        const downloadHistoryFile = (taskId, type) => { window.open('/api/download/' + taskId + '/' + type, '_blank'); };
-
-        const toggleCrops = async (item) => {
-          item.showCrops = !item.showCrops;
-          if (item.showCrops && !item.cropsLoaded) {
-            try {
-              const res = await fetch('/api/tasks/' + item.task_id + '/crops');
-              const data = await res.json();
-              if (res.ok) { item.crops = data.crops || []; item.cropsLoaded = true; }
-            } catch (e) { ElementPlus.ElMessage.error('获取裁剪记录失败: ' + e.message); }
-          }
-        };
-
-        const downloadCropFile = (cropId) => { window.open('/api/download/crop/' + cropId, '_blank'); };
-
-        const reprocessTask = async (taskId) => {
-          try {
-            const res = await fetch('/api/tasks/' + taskId + '/reprocess', { method: 'POST' });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || '重新制作失败');
-            steps.forEach(s => { s.active = false; s.completed = false; });
-            task.value = { task_id: taskId, status: 'processing', step_progress: 0, current_step: '准备开始' };
-            elapsedSec.value = 0;
-            etaSec.value = null;
-            selectedFile.value = null;
-            fileList.value = [];
-            activeTab.value = 'main';
-            startPolling(taskId);
-            ElementPlus.ElMessage.success('已开始重新制作');
-          } catch (e) { ElementPlus.ElMessage.error('重新制作失败: ' + e.message); }
-        };
-
-        /* ========== 裁剪 ========== */
-        const cropDialogVisible = ref(false);
-        const currentCropTaskId = ref('');
-        const cropSegments = ref([{ start: '00:03:04', end: '00:04:08' }]);
-        const cropSubmitting = ref(false);
-        const cropMode = ref('remove');
-
-        const openCropDialog = (taskId) => {
-          currentCropTaskId.value = taskId;
-          cropSegments.value = [{ start: '00:03:04', end: '00:04:08' }];
-          cropMode.value = 'remove';
-          cropDialogVisible.value = true;
-        };
-
-        const addCropSegment = () => { cropSegments.value.push({ start: '', end: '' }); };
-        const removeCropSegment = (idx) => { cropSegments.value.splice(idx, 1); };
-
-        const submitCrop = async () => {
-          if (!currentCropTaskId.value || cropSegments.value.some(seg => !seg.start || !seg.end)) {
-            ElementPlus.ElMessage.warning('请填写完整的时间段');
-            return;
-          }
-          cropSubmitting.value = true;
-          try {
-            const res = await fetch('/api/tasks/' + currentCropTaskId.value + '/crop', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ segments: cropSegments.value, mode: cropMode.value })
-            });
-            if (res.ok) {
-              ElementPlus.ElMessage.success('裁剪任务已提交');
-              cropDialogVisible.value = false;
-              fetchHistory();
-              startCropPolling(currentCropTaskId.value);
-            } else {
-              const err = await res.json();
-              throw new Error(err.detail || '提交失败');
-            }
-          } catch (e) {
-            ElementPlus.ElMessage.error('提交失败: ' + e.message);
-          } finally {
-            cropSubmitting.value = false;
-          }
-        };
-
-        let cropPollTimer = null;
-        const startCropPolling = (taskId) => {
-          if (cropPollTimer) clearInterval(cropPollTimer);
-          let lastCropCount = 0;
-          cropPollTimer = setInterval(async () => {
-            try {
-              const res = await fetch('/api/tasks/' + taskId + '/crops');
-              const data = await res.json();
-              if (!res.ok) return;
-              const crops = data.crops || [];
-              const allDone = crops.length > 0 && crops.every(c => c.status === 'success' || c.status === 'failed');
-              const item = historyTasks.value.find(t => t.task_id === taskId);
-              if (item && item.showCrops) { item.crops = crops; item.cropsLoaded = true; }
-              if (allDone) {
-                clearInterval(cropPollTimer);
-                cropPollTimer = null;
-                const successCount = crops.filter(c => c.status === 'success').length;
-                if (successCount > lastCropCount) ElementPlus.ElMessage.success(successCount + ' 个裁剪任务已完成');
-              }
-              lastCropCount = crops.filter(c => c.status === 'success').length;
-            } catch (e) { console.error('裁剪轮询出错', e); }
-          }, 2000);
-        };
-
-        /* ========== 配置 ========== */
-        const configForm = reactive({
-          features: { enable_asr_prompt: true, enable_ad_detection: false, enable_summary: false, enable_titles: false },
-          ollama: { analysis: { model: 'qwen2:7b', temperature: 0.1 }, translate: { model: 'qwen2:7b', temperature: 0.1 } },
-          translate_backend: 'ollama',
-          online_api: { base_url: 'https://api.openai.com', api_key: '', model: 'gpt-3.5-turbo', batch_mode: false, batch_size: 5, fallbacks: [] },
-          local_translation: { model_dir: '', topic: '' },
-          font: { zh: 'SimHei', en: 'Arial', scale: 1.0 }
-        });
-
-        const topicPreset = ref('');
-        const configSaved = ref(false);
-
-        const onTopicChange = (val) => {
-          const topics = {
-            football: 'football match analysis tactics players',
-            f1: 'F1 racing driver circuit lap time strategy',
-            basketball: 'basketball game players tactics score',
-            esports: 'esports game tournament players strategy'
-          };
-          if (val && val !== 'custom') configForm.local_translation.topic = topics[val];
-          else if (val === 'custom') configForm.local_translation.topic = '';
-          else configForm.local_translation.topic = '';
-        };
-
-        const addFallback = () => {
-          if (!configForm.online_api.fallbacks) configForm.online_api.fallbacks = [];
-          configForm.online_api.fallbacks.push({ name: '备用' + (configForm.online_api.fallbacks.length + 1), base_url: '', api_key: '', model: '' });
-        };
-
-        const removeFallback = (idx) => { configForm.online_api.fallbacks.splice(idx, 1); };
-
-        const saveConfig = async () => {
-          try {
-            const res = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(configForm) });
-            if (res.ok) {
-              configSaved.value = true;
-              ElementPlus.ElMessage.success('配置保存成功');
-              setTimeout(() => { configSaved.value = false; }, 2000);
-            } else throw new Error('保存失败');
-          } catch (e) { ElementPlus.ElMessage.error('保存失败: ' + e.message); }
-        };
-
-        /* ========== beforeunload 警告 ========== */
-        const onBeforeUnload = (e) => {
-          if (isUploadingFlag) {
-            e.preventDefault();
-            e.returnValue = '视频正在上传中，离开可能导致上传中断。是否继续？';
-          }
-        };
-
-        /* ========== 生命周期 ========== */
-        onMounted(async () => {
-          await uploadDB.init();
-          await loadPendingUploads();
-          fetchHistory();
-          fetch('/api/config').then(res => res.json()).then(data => {
-            Object.assign(configForm, data);
-            if (!configForm.online_api.fallbacks) configForm.online_api.fallbacks = [];
-          }).catch(() => {});
-          window.addEventListener('beforeunload', onBeforeUnload);
-        });
-
-        onUnmounted(() => {
-          stopPolling();
-          stopElapsedTimer();
-          if (cropPollTimer) clearInterval(cropPollTimer);
-          window.removeEventListener('beforeunload', onBeforeUnload);
-        });
-
-        return {
-          activeTab, fileList, selectedFile, uploading, task, elapsedSec, etaSec, steps,
-          onFileChange, uploadVideo, resetMain, formatTime, formatFileSize,
-          uploadChunkProgress, pendingUploads, cancelPendingUpload,
-          historyFilter, filteredHistoryTasks, fetchHistory, deleteTask, cleanupCompleted,
-          downloadHistoryFile, toggleCrops, downloadCropFile, reprocessTask,
-          cropDialogVisible, currentCropTaskId, cropSegments, cropSubmitting, cropMode,
-          openCropDialog, addCropSegment, removeCropSegment, submitCrop,
-          configForm, topicPreset, configSaved, onTopicChange, saveConfig, addFallback, removeFallback,
-          formatDate, onSearchInput,
-          advancedCollapsed, subtitleFile, subtitleFileList, onSubtitleChange, skippedWhisper
-        };
-      }
-    });
-
-    app.use(ElementPlus);
-    app.mount('#app');
-  </script>
+<div id="app">
+<div class="app-header">
+<h1>199 视频处理中枢</h1>
+<p>AI 驱动的字幕生成 · 翻译 · 压制一站式流水线</p>
+</div>
+<el-tabs v-model="activeTab" type="border-card">
+<!-- ==================== 主流程 ==================== -->
+<el-tab-pane label="处理中心" name="main">
+<div class="glass-card" v-if="!task">
+<el-upload class="upload-zone" drag :auto-upload="false" :on-change="onFileChange" accept="video/*" :limit="1" v-model:file-list="fileList">
+<div style="font-size: 32px; margin-bottom: 12px;">📁</div>
+<div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">拖拽视频文件到此处</div>
+<div style="font-size: 13px; color: var(--text-secondary);">支持 MP4、WebM、MKV 等格式，或点击选择文件</div>
+</el-upload>
+<div class="upload-file-info" v-if="selectedFile"> 已选择：{{ selectedFile.name }} ({{ formatFileSize(selectedFile.size) }}) </div>
+<!-- 高级选项：上传字幕加速 -->
+<div class="advanced-options-panel">
+<el-button type="info" text @click="advancedCollapsed = !advancedCollapsed"> 高级选项 {{ advancedCollapsed ? '▲' : '▼' }} </el-button>
+<div v-if="advancedCollapsed" class="subtitle-upload-box">
+<el-upload drag :auto-upload="false" :on-change="onSubtitleChange" accept=".srt" :limit="1" v-model:file-list="subtitleFileList" style="width: 100%;">
+<div style="font-size: 24px; margin-bottom: 8px;">📄</div>
+<div style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">上传英文字幕</div>
+<div style="font-size: 12px; color: var(--text-secondary);">已有英文字幕？上传即可跳过耗时语音识别（提速 80%）</div>
+</el-upload>
+<div v-if="subtitleFile" class="subtitle-success-hint">✓ 已选择字幕: {{ subtitleFile.name }}</div>
+</div>
+</div>
+<!-- 分片上传进度 -->
+<div class="upload-progress-bar" v-if="uploading && uploadChunkProgress.total > 0">
+<el-progress :percentage="Math.round((uploadChunkProgress.uploaded / uploadChunkProgress.total) * 100)" :stroke-width="8" :format="() => '上传分片 ' + uploadChunkProgress.uploaded + '/' + uploadChunkProgress.total" />
+</div>
+<el-button class="action-btn" :disabled="!selectedFile || uploading" @click="uploadVideo" style="margin-top: 20px;"> {{ uploading ? '上传中...' : '开始处理' }} </el-button>
+<!-- 续传提示 -->
+<div v-if="pendingUploads.length > 0 && !selectedFile && !uploading" style="margin-top: 16px; text-align: center;">
+<el-alert type="info" :closable="false" style="margin-bottom: 12px;">
+<template #title>发现 {{ pendingUploads.length }} 个未完成的上传</template>
+</el-alert>
+<div v-for="pu in pendingUploads" :key="pu.uploadId" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;"> {{ pu.fileName }} ({{ formatFileSize(pu.fileSize) }}) <el-button type="danger" text size="small" @click="cancelPendingUpload(pu.uploadId)">取消</el-button> </div>
+<div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;"> 请重新选择相同文件，系统将自动跳过已上传部分 </div>
+</div>
+</div>
+<!-- 处理中 / 完成 / 失败 状态 -->
+<div v-if="task" :class="['glass-card', task.status === 'success' ? 'success-card' : '', task.status === 'failed' ? 'error-card' : '']">
+<div class="step-timeline" v-if="task.status === 'processing' || task.status === 'pending'">
+<div v-for="(step, idx) in steps" :key="idx" :class="['step-item', { active: step.active, completed: step.completed }]">
+<div class="step-circle">{{ step.completed ? '✓' : idx + 1 }}</div>
+<div class="step-label">{{ step.label }}</div>
+<div class="step-line"></div>
+</div>
+</div>
+<div v-if="task.status === 'processing' || task.status === 'pending'" class="dashboard">
+<div class="progress-ring">
+<el-progress type="circle" :percentage="Math.round(task.step_progress || 0)" :stroke-width="12" :width="180" color="url(#gradient)">
+<template #default>
+<div class="progress-center">
+<div class="progress-percent">{{ Math.round(task.step_progress || 0) }}%</div>
+<div class="progress-step-name">{{ task.current_step || '准备中' }}</div>
+<div v-if="skippedWhisper" style="font-size: 12px; color: var(--success); margin-top: 4px;">⚡ 检测到外部字幕，已跳过语音识别</div>
+</div>
+</template>
+</el-progress>
+<svg width="0" height="0">
+<defs>
+<linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+<stop offset="0%" stop-color="#06b6d4" />
+<stop offset="100%" stop-color="#3b82f6" />
+</linearGradient>
+</defs>
+</svg>
+</div>
+<div class="time-cards">
+<div class="time-card">
+<div class="label">已用时间</div>
+<div class="value">{{ formatTime(elapsedSec) }}</div>
+</div>
+<div class="time-card">
+<div class="label">预计剩余</div>
+<div class="value">{{ etaSec != null && etaSec > 0 ? formatTime(etaSec) : '--:--' }}</div>
+</div>
+</div>
+</div>
+<div v-if="task.status === 'success'">
+<div style="text-align: center; padding: 20px 0;">
+<div style="font-size: 48px;">✅</div>
+<h2 style="margin: 10px 0; color: var(--success);">处理成功！</h2>
+<p style="color: var(--text-secondary);">你的视频已处理完毕，请下载文件</p>
+</div>
+<div class="download-grid">
+<a :href="'/api/download/' + task.task_id + '/video'" class="download-item" v-if="task.download_urls && task.download_urls.video"> <span style="font-size: 28px;">🎬</span><span>压制视频</span> </a>
+<a :href="'/api/download/' + task.task_id + '/zh_srt'" class="download-item" v-if="task.download_urls && task.download_urls.zh_srt"> <span style="font-size: 28px;">🇨🇳</span><span>中文字幕</span> </a>
+<a :href="'/api/download/' + task.task_id + '/en_srt'" class="download-item" v-if="task.download_urls && task.download_urls.en_srt"> <span style="font-size: 28px;">🇬🇧</span><span>英文字幕</span> </a>
+<a :href="'/api/download/' + task.task_id + '/meta'" class="download-item" v-if="task.download_urls && task.download_urls.meta"> <span style="font-size: 28px;">📄</span><span>元数据</span> </a>
+</div>
+<div style="text-align: center; margin-top: 24px;"> <el-button @click="resetMain" type="info" text>处理另一个视频</el-button> </div>
+</div>
+<div v-if="task.status === 'failed'">
+<div style="text-align: center; padding: 20px 0;">
+<div style="font-size: 48px;">❌</div>
+<h2 style="margin: 10px 0; color: var(--danger);">处理失败</h2>
+</div>
+<div class="error-message">{{ task.error_message }}</div>
+<div style="text-align: center;"> <el-button @click="resetMain" type="primary">重新上传</el-button> </div>
+</div>
+</div>
+</el-tab-pane>
+<!-- ==================== 历史记录 ==================== -->
+<el-tab-pane label="任务历史" name="history">
+<div class="glass-card">
+<div class="history-toolbar">
+<el-radio-group v-model="historyFilter.status" @change="fetchHistory" class="history-status-tabs" size="small"> <el-radio-button label="">全部</el-radio-button> <el-radio-button label="pending">准备中</el-radio-button> <el-radio-button label="processing">处理中</el-radio-button> <el-radio-button label="success">成功</el-radio-button> <el-radio-button label="failed">失败</el-radio-button> </el-radio-group>
+<el-input v-model="historyFilter.search" placeholder="搜索文件名..." clearable @input="onSearchInput" @clear="fetchHistory" class="history-search-input" />
+<el-button @click="fetchHistory" type="primary" plain>刷新</el-button>
+<el-popconfirm title="确定清除所有已完成和失败的任务？" @confirm="cleanupCompleted"> <template #reference> <el-button type="danger" plain>一键清理</el-button> </template> </el-popconfirm>
+</div>
+<div class="history-grid">
+<div v-for="item in filteredHistoryTasks" :key="item.task_id" class="history-card">
+<div class="card-header">
+<div class="card-filename" :title="item.original_filename"> {{ item.original_filename || item.task_id }} </div>
+<div class="card-status"> <el-tag :type="item.status === 'success' ? 'success' : item.status === 'failed' ? 'danger' : 'warning'" size="small" effect="dark"> {{ item.status === 'success' ? '成功' : item.status === 'failed' ? '失败' : item.status === 'pending' ? '准备中' : '处理中' }} </el-tag> </div>
+</div>
+<div class="card-meta"> <span>{{ formatDate(item.created_at) }}</span> <span v-if="item.file_size">{{ formatFileSize(item.file_size) }}</span> </div>
+<div class="card-actions">
+<template v-if="item.status === 'success'"> <el-button size="small" @click="downloadHistoryFile(item.task_id, 'video')" v-if="item.output_video_path">🎬 原版</el-button> <el-button size="small" @click="downloadHistoryFile(item.task_id, 'zh_srt')" v-if="item.output_zh_srt">🇨🇳 中字</el-button> <el-button size="small" @click="downloadHistoryFile(item.task_id, 'en_srt')" v-if="item.output_en_srt">🇬🇧 英字</el-button> <el-button size="small" @click="downloadHistoryFile(item.task_id, 'meta')" v-if="item.output_meta">📄 元数据</el-button> <el-button size="small" type="primary" plain @click="openCropDialog(item.task_id)">✂️ 裁剪</el-button> </template>
+<el-button size="small" type="warning" plain @click="reprocessTask(item.task_id)" v-if="item.status === 'success' || item.status === 'failed'"> 重新制作 </el-button>
+<el-button size="small" type="danger" @click="deleteTask(item.task_id)">删除</el-button>
+<el-button size="small" type="info" text @click="toggleCrops(item)" v-if="item.status === 'success'" style="margin-left: auto;"> {{ item.showCrops ? '收起裁剪版 ▲' : '查看裁剪版 ▼' }} </el-button>
+</div>
+<div v-if="item.showCrops" class="crop-list">
+<div v-if="!item.cropsLoaded" style="font-size:12px; color:var(--text-secondary);">加载中...</div>
+<div v-else-if="item.crops.length === 0" style="font-size:12px; color:var(--text-secondary);">暂无裁剪记录</div>
+<div v-else v-for="crop in item.crops" :key="crop.crop_id" class="crop-item">
+<div class="crop-info">
+<span>裁剪片段数: {{ crop.segments ? crop.segments.length : 0 }}</span>
+<el-tag :type="crop.status === 'success' ? 'success' : crop.status === 'failed' ? 'danger' : 'warning'" size="small"> {{ crop.status === 'success' ? '成功' : crop.status === 'failed' ? '失败' : '处理中' }} </el-tag>
+</div>
+<div class="crop-action">
+<el-button v-if="crop.status === 'success'" size="small" type="primary" link @click="downloadCropFile(crop.crop_id)">下载</el-button>
+<div v-if="crop.status === 'failed'" style="font-size: 12px; color: var(--danger);" :title="crop.error_message">失败详情</div>
+</div>
+</div>
+</div>
+</div>
+<div v-if="filteredHistoryTasks.length === 0" style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);"> 暂无历史任务 </div>
+</div>
+</div>
+</el-tab-pane>
+<!-- ==================== 配置 ==================== -->
+<el-tab-pane label="系统配置" name="config">
+<div class="config-cards">
+<div class="config-card">
+<h3>功能开关</h3>
+<div class="config-row"> <span>ASR 提示词生成</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">基于标题预测专有名词，提高识别准确率</span> <el-switch v-model="configForm.features.enable_asr_prompt" /> </div> </div>
+<div class="config-row"> <span>广告检测</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">自动识别并标记广告片段</span> <el-switch v-model="configForm.features.enable_ad_detection" /> </div> </div>
+<div class="config-row"> <span>内容摘要</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">生成视频内容中文摘要</span> <el-switch v-model="configForm.features.enable_summary" /> </div> </div>
+<div class="config-row"> <span>推荐标题</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">生成 5 个吸引人的中文标题</span> <el-switch v-model="configForm.features.enable_titles" /> </div> </div>
+</div>
+<div class="config-card">
+<h3>模型设置</h3>
+<div class="config-row"><span>分析模型</span><el-input v-model="configForm.ollama.analysis.model" style="width: 200px;" /></div>
+<div class="config-row"><span>分析温度</span><el-slider v-model="configForm.ollama.analysis.temperature" :min="0" :max="1" :step="0.05" show-input style="width: 200px;" /></div>
+<div class="config-row"><span>翻译模型</span><el-input v-model="configForm.ollama.translate.model" style="width: 200px;" /></div>
+<div class="config-row"><span>翻译温度</span><el-slider v-model="configForm.ollama.translate.temperature" :min="0" :max="1" :step="0.05" show-input style="width: 200px;" /></div>
+</div>
+<div class="config-card">
+<h3>翻译后端</h3>
+<div class="config-row"> <span>翻译方式</span> <el-select v-model="configForm.translate_backend" style="width: 200px;"> <el-option label="Ollama (本地模型)" value="ollama" /> <el-option label="本地 Transformers (HY-MT1.5)" value="local_transformers" /> <el-option label="在线 API (OpenAI 兼容)" value="online_api" /> </el-select> </div>
+<template v-if="configForm.translate_backend === 'online_api'">
+<!-- 🆕 新增：厂商选择下拉菜单 -->
+<div class="config-row">
+<span>API 厂商</span>
+<el-select v-model="configForm.online_api.provider" placeholder="选择厂商" @change="onProviderChange" style="width: 200px;">
+<el-option label="OpenAI (原生)" value="openai" />
+<el-option label="DeepSeek (深度求索)" value="deepseek" />
+<el-option label="SiliconFlow (硅基流动)" value="siliconflow" />
+<el-option label="智谱 AI (GLM)" value="zhipu" />
+<el-option label="通义千问" value="qwen" />
+<el-option label="Moonshot (Kimi)" value="moonshot" />
+</el-select>
+<span class="desc" style="margin-left: 10px; font-weight: normal; color: var(--text-tertiary);">选择后将自动填充 URL 与模型</span>
+</div>
+
+<div class="config-row"><span>API 地址</span><el-input v-model="configForm.online_api.base_url" placeholder="https://api.openai.com" style="width: 300px;" /></div>
+<div class="config-row"><span>API 密钥</span><el-input v-model="configForm.online_api.api_key" type="password" show-password placeholder="sk-..." style="width: 300px;" /></div>
+<div class="config-row"><span>模型名称</span><el-input v-model="configForm.online_api.model" placeholder="gpt-3.5-turbo / deepseek-chat" style="width: 200px;" /></div>
+<div class="config-row"> <span>翻译模式</span> <el-select v-model="configForm.online_api.batch_mode" style="width: 150px;"> <el-option label="逐句翻译（稳定）" :value="false" /> <el-option label="批量翻译（快速）" :value="true" /> </el-select> </div>
+<div class="config-row" v-if="configForm.online_api.batch_mode"><span>每批句数</span><el-slider v-model="configForm.online_api.batch_size" :min="1" :max="20" :step="1" show-input style="width: 200px;" /></div>
+<div style="margin-top: 16px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"> <span style="font-weight: 600; font-size: 15px;">备用 API（额度耗尽时自动切换）</span> <el-button type="primary" plain size="small" @click="addFallback">+ 添加备用</el-button> </div>
+<div v-for="(fb, idx) in (configForm.online_api.fallbacks || [])" :key="idx" class="fallback-card">
+<div class="fallback-header"> <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">备用 API {{ idx + 1 }}</span> <el-button type="danger" plain size="small" @click="removeFallback(idx)">移除</el-button> </div>
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<div class="config-row"><span>名称</span><el-input v-model="fb.name" placeholder="备用1" style="width: 200px;" /></div>
+<!-- 🆕 新增：备用 API 厂商选择 -->
+<div class="config-row">
+<span>API 厂商</span>
+<el-select v-model="fb.provider" placeholder="选择厂商" @change="(val) => onFallbackProviderChange(val, idx)" style="width: 200px;">
+<el-option label="OpenAI (原生)" value="openai" />
+<el-option label="DeepSeek (深度求索)" value="deepseek" />
+<el-option label="SiliconFlow (硅基流动)" value="siliconflow" />
+<el-option label="智谱 AI (GLM)" value="zhipu" />
+<el-option label="通义千问" value="qwen" />
+<el-option label="Moonshot (Kimi)" value="moonshot" />
+</el-select>
+</div>
+<div class="config-row"><span>API 地址</span><el-input v-model="fb.base_url" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" style="width: 300px;" /></div>
+<div class="config-row"><span>API 密钥</span><el-input v-model="fb.api_key" type="password" show-password placeholder="sk-..." style="width: 300px;" /></div>
+<div class="config-row"><span>模型名称</span><el-input v-model="fb.model" placeholder="qwen-turbo" style="width: 200px;" /></div>
+</div>
+</div>
+<div v-if="!configForm.online_api.fallbacks || configForm.online_api.fallbacks.length === 0" style="font-size: 13px; color: var(--text-secondary); text-align: center; padding: 12px;"> 暂无备用 API，主 API 额度耗尽时任务将失败 </div>
+</div>
+</template>
+<div class="config-row" v-if="configForm.translate_backend === 'local_transformers'"><span>模型路径</span><el-input v-model="configForm.local_translation.model_dir" placeholder="E:\modelscope\..." style="width: 300px;" /></div>
+<div class="config-row" v-if="configForm.translate_backend === 'local_transformers'"> <span>视频主题</span> <div style="display: flex; gap: 8px; align-items: center;"> <el-select v-model="topicPreset" @change="onTopicChange" style="width: 150px;"> <el-option label="无主题" value="" /> <el-option label="足球" value="football" /> <el-option label="F1赛车" value="f1" /> <el-option label="篮球" value="basketball" /> <el-option label="电竞" value="esports" /> <el-option label="自定义" value="custom" /> </el-select> <el-input v-if="topicPreset === 'custom'" v-model="configForm.local_translation.topic" placeholder="英文主题，如 football tactical analysis" style="width: 220px;" /> </div> </div>
+</div>
+<div class="config-card">
+<h3>字幕样式</h3>
+<div class="config-row"><span>中文字体</span><el-input v-model="configForm.font.zh" style="width: 200px;" /></div>
+<div class="config-row"><span>英文字体</span><el-input v-model="configForm.font.en" style="width: 200px;" /></div>
+<div class="config-row"><span>字体缩放</span><el-slider v-model="configForm.font.scale" :min="0.8" :max="1.5" :step="0.05" show-input style="width: 200px;" /></div>
+</div>
+<el-button type="primary" @click="saveConfig" size="large" style="align-self: flex-end;"> {{ configSaved ? '已保存' : '保存配置' }} </el-button>
+</div>
+</el-tab-pane>
+</el-tabs>
+
+<!-- 裁剪对话框 -->
+<el-dialog v-model="cropDialogVisible" title="视频片段裁剪" width="520px">
+<el-radio-group v-model="cropMode" style="margin-bottom: 16px; display: flex;"> <el-radio-button label="remove">删除片段（去掉广告）</el-radio-button> <el-radio-button label="keep">保留片段（拼接精华）</el-radio-button> </el-radio-group>
+<div style="margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;"> <template v-if="cropMode === 'remove'"> 请输入你要<strong style="color:var(--danger)">删除</strong>的视频片段（如广告段）。<br> 系统会自动保留剩余内容，无缝拼接成新视频。 </template> <template v-else> 请输入你要<strong style="color:var(--accent-cyan)">保留</strong>的视频片段。<br> 最终会将所有保留段按照顺序拼接到一起。 </template> </div>
+<div v-for="(seg, idx) in cropSegments" :key="idx" style="background: var(--bg-secondary); border: 1px solid var(--border); padding: 16px; border-radius: var(--radius-md); margin-bottom: 12px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;"> <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">{{ cropMode === 'remove' ? '删除段' : '保留段' }} {{ idx + 1 }}</span> <el-button type="danger" plain size="small" @click="removeCropSegment(idx)" :disabled="cropSegments.length <= 1">移除</el-button> </div>
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<div> <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">起始时间（如 00:03:04）</div> <el-input v-model="seg.start" placeholder="00:03:04" size="large" /> </div>
+<div> <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">结束时间（如 00:04:08）</div> <el-input v-model="seg.end" placeholder="00:04:08" size="large" /> </div>
+</div>
+</div>
+<el-button type="primary" plain size="small" @click="addCropSegment" style="width: 100%; margin-top: 6px; border-style: dashed;"> + 添加{{ cropMode === 'remove' ? '删除' : '保留' }}时间段 </el-button>
+<template #footer> <span class="dialog-footer"> <el-button @click="cropDialogVisible = false">取消</el-button> <el-button type="primary" :loading="cropSubmitting" @click="submitCrop">提交裁剪后台任务</el-button> </span> </template>
+</el-dialog>
+</div>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/element-plus"></script>
+<script>
+const { createApp, ref, reactive, computed, onMounted, onUnmounted } = Vue;
+
+/* ========== IndexedDB 辅助：存储上传状态，用于断点续传 ========== */
+const uploadDB = {
+db: null,
+async init() { return new Promise((resolve) => { const request = indexedDB.open('SubtitleFlowUploads', 1); request.onupgradeneeded = (e) => { const db = e.target.result; if (!db.objectStoreNames.contains('pending_uploads')) { db.createObjectStore('pending_uploads', { keyPath: 'uploadId' }); } }; request.onsuccess = (e) => { this.db = e.target.result; resolve(); }; request.onerror = () => { console.warn('IndexedDB 不可用，断点续传功能关闭'); resolve(); }; }); },
+async save(state) { if (!this.db) return; try { const tx = this.db.transaction('pending_uploads', 'readwrite'); tx.objectStore('pending_uploads').put(state); } catch (e) { console.warn('IDB save fail', e); } },
+async get(uploadId) { if (!this.db) return null; try { const tx = this.db.transaction('pending_uploads', 'readonly'); const req = tx.objectStore('pending_uploads').get(uploadId); return new Promise((r) => { req.onsuccess = () => r(req.result || null); req.onerror = () => r(null); }); } catch (e) { return null; } },
+async getAll() { if (!this.db) return []; try { const tx = this.db.transaction('pending_uploads', 'readonly'); const req = tx.objectStore('pending_uploads').getAll(); return new Promise((r) => { req.onsuccess = () => r(req.result || []); req.onerror = () => r([]); }); } catch (e) { return []; } },
+async remove(uploadId) { if (!this.db) return; try { const tx = this.db.transaction('pending_uploads', 'readwrite'); tx.objectStore('pending_uploads').delete(uploadId); } catch (e) { console.warn('IDB remove fail', e); } }
+};
+
+const CHUNK_SIZE = 5 * 1024 * 1024;
+const CHUNK_THRESHOLD = 5 * 1024 * 1024;
+
+const app = createApp({
+setup() {
+const activeTab = ref('main');
+const fileList = ref([]);
+const selectedFile = ref(null);
+const uploading = ref(false);
+const task = ref(null);
+const elapsedSec = ref(0);
+const etaSec = ref(null);
+let pollingTimer = null;
+let elapsedTimer = null;
+let stepStartTime = null;
+let isUploadingFlag = false;
+const uploadChunkProgress = reactive({ uploaded: 0, total: 0 });
+const pendingUploads = ref([]);
+// 新增：高级选项与字幕上传状态
+const advancedCollapsed = ref(false);
+const subtitleFile = ref(null);
+const subtitleFileList = ref([]);
+const skippedWhisper = ref(false);
+
+const steps = reactive([
+{ label: '格式转换', active: false, completed: false },
+{ label: '生成提示词', active: false, completed: false },
+{ label: '语音识别', active: false, completed: false },
+{ label: '分析与翻译', active: false, completed: false },
+{ label: '字幕压制', active: false, completed: false },
+]);
+
+const onFileChange = (file) => { selectedFile.value = file.raw; fileList.value = [file]; };
+const onSubtitleChange = (file) => { subtitleFile.value = file.raw; subtitleFileList.value = [file]; };
+
+/* ========== 上传逻辑 ========== */
+const uploadVideo = async () => {
+if (!selectedFile.value) return;
+uploading.value = true;
+isUploadingFlag = true;
+uploadChunkProgress.uploaded = 0;
+uploadChunkProgress.total = 0;
+try {
+const file = selectedFile.value;
+if (file.size >= CHUNK_THRESHOLD) { await chunkedUpload(file); } else { await simpleUpload(file); }
+} catch (e) { ElementPlus.ElMessage.error('上传失败: ' + e.message); }
+finally { uploading.value = false; isUploadingFlag = false; uploadChunkProgress.uploaded = 0; uploadChunkProgress.total = 0; }
+};
+
+const simpleUpload = async (file) => {
+const formData = new FormData();
+formData.append('file', file);
+if (subtitleFile.value) { formData.append('subtitle', subtitleFile.value); }
+const res = await fetch('/api/upload', { method: 'POST', body: formData });
+const data = await res.json();
+if (!res.ok) throw new Error(data.detail || '上传失败');
+task.value = { task_id: data.task_id, status: 'processing', step_progress: 0, current_step: '准备开始' };
+startPolling(data.task_id);
+};
+
+const chunkedUpload = async (file) => {
+const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+let uploadId = null;
+let startChunk = 0;
+const allPending = await uploadDB.getAll();
+const matching = allPending.find(p => p.fileName === file.name && p.fileSize === file.size);
+if (matching) {
+try {
+const statusRes = await fetch('/api/upload/status/' + matching.uploadId);
+if (statusRes.ok) {
+const statusData = await statusRes.json();
+if (statusData.status === 'uploading') {
+uploadId = matching.uploadId;
+const uploaded = statusData.uploaded_chunks || [];
+startChunk = uploaded.length > 0 ? Math.max(...uploaded) + 1 : 0;
+if (startChunk >= totalChunks) startChunk = totalChunks;
+console.log('[upload] 续传: 从分片 ' + startChunk + '/' + totalChunks + ' 开始');
+}
+}
+} catch (e) { }
+}
+if (!uploadId) {
+const initRes = await fetch('/api/upload/init', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: file.name, file_size: file.size, total_chunks: totalChunks }) });
+const initData = await initRes.json();
+if (!initRes.ok) throw new Error(initData.detail || '初始化上传失败');
+uploadId = initData.upload_id;
+startChunk = 0;
+}
+await uploadDB.save({ uploadId, fileName: file.name, fileSize: file.size, totalChunks, timestamp: Date.now() });
+uploadChunkProgress.total = totalChunks;
+uploadChunkProgress.uploaded = startChunk;
+for (let i = startChunk; i < totalChunks; i++) {
+const start = i * CHUNK_SIZE;
+const end = Math.min(start + CHUNK_SIZE, file.size);
+const chunkBlob = file.slice(start, end);
+const formData = new FormData();
+formData.append('chunk', chunkBlob);
+const chunkRes = await fetch('/api/upload/chunk?upload_id=' + uploadId + '&chunk_index=' + i, { method: 'POST', body: formData });
+if (!chunkRes.ok) { const errData = await chunkRes.json().catch(() => ({})); throw new Error(errData.detail || '分片 ' + i + ' 上传失败'); }
+uploadChunkProgress.uploaded = i + 1;
+await uploadDB.save({ uploadId, fileName: file.name, fileSize: file.size, totalChunks, timestamp: Date.now() });
+}
+const hasSub = !!subtitleFile.value;
+const completeRes = await fetch('/api/upload/complete?upload_id=' + uploadId + '&has_subtitle=' + hasSub, { method: 'POST' });
+const completeData = await completeRes.json();
+if (!completeRes.ok) throw new Error(completeData.detail || '完成上传失败');
+await uploadDB.remove(uploadId);
+if (hasSub) {
+const subFormData = new FormData();
+subFormData.append('subtitle', subtitleFile.value);
+const subRes = await fetch('/api/upload/subtitle?task_id=' + completeData.task_id, { method: 'POST', body: subFormData });
+if (!subRes.ok) { const errSub = await subRes.json().catch(() => ({})); throw new Error(errSub.detail || '字幕上传失败'); }
+}
+task.value = { task_id: completeData.task_id, status: 'processing', step_progress: 0, current_step: '准备开始' };
+startPolling(completeData.task_id);
+await loadPendingUploads();
+};
+
+const cancelPendingUpload = async (uploadId) => { await uploadDB.remove(uploadId); await loadPendingUploads(); };
+const loadPendingUploads = async () => { const all = await uploadDB.getAll(); pendingUploads.value = all.map(p => ({ uploadId: p.uploadId, fileName: p.fileName, fileSize: p.fileSize })); };
+
+/* ========== 轮询 ========== */
+const startPolling = (taskId) => {
+stopPolling();
+pollingTimer = setInterval(async () => {
+try {
+const res = await fetch('/api/task/' + taskId);
+const t = await res.json();
+if (!res.ok) throw new Error(t.detail);
+task.value = t;
+updateSteps(t.current_step);
+if (t.step_started_at) {
+stepStartTime = new Date(t.step_started_at + 'Z').getTime();
+startElapsedTimer(stepStartTime);
+}
+etaSec.value = t.eta_sec ?? null;
+if (t.status === 'success' || t.status === 'failed') { stopPolling(); stopElapsedTimer(); fetchHistory(); }
+} catch (e) { console.error('轮询出错', e); }
+}, 1500);
+};
+const stopPolling = () => { if (pollingTimer) clearInterval(pollingTimer); };
+const stopElapsedTimer = () => { if (elapsedTimer) clearInterval(elapsedTimer); };
+const updateSteps = (current) => {
+const map = { '格式转换': 0, '生成ASR提示词': 1, '语音识别': 2, '分析与翻译': 3, '压制字幕': 4 };
+const idx = map[current];
+if (current === '分析与翻译' && !steps[2].completed) {
+skippedWhisper.value = true;
+steps[0].completed = true;
+steps[1].completed = true;
+steps[2].active = false;
+steps[2].completed = true;
+steps[3].active = true;
+} else {
+skippedWhisper.value = false;
+steps.forEach((s, i) => { s.active = (i === idx); s.completed = (i < idx); });
+}
+if (!current || current === '完成' || current === '全部完成') { steps.forEach(s => { s.active = false; s.completed = true; }); }
+};
+const startElapsedTimer = (startTs) => {
+stopElapsedTimer();
+elapsedTimer = setInterval(() => { elapsedSec.value = (Date.now() - startTs) / 1000; }, 200);
+};
+
+/* ========== 工具函数 ========== */
+const formatTime = (sec) => { if (sec == null || isNaN(sec)) return '--:--'; const m = Math.floor(sec / 60); const s = Math.floor(sec % 60); return m.toString().padStart(2, '0') + ':' + s.toString().padStart(2, '0'); };
+const formatFileSize = (bytes) => { if (!bytes) return '0 B'; const k = 1024; const sizes = ['B', 'KB', 'MB', 'GB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; };
+const formatDate = (dateStr) => { if (!dateStr) return '-'; const normalized = dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr) ? dateStr : dateStr + 'Z'; const date = new Date(normalized); if (isNaN(date.getTime())) return '-'; return date.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }); };
+const resetMain = () => { task.value = null; fileList.value = []; selectedFile.value = null; elapsedSec.value = 0; etaSec.value = null; skippedWhisper.value = false; advancedCollapsed.value = false; subtitleFile.value = null; subtitleFileList.value = []; steps.forEach(s => { s.active = false; s.completed = false; }); };
+
+/* ========== 历史记录 ========== */
+const historyTasks = ref([]);
+const historyFilter = reactive({ status: '', search: '' });
+let debounceTimer = null;
+const onSearchInput = () => { if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { fetchHistory(); }, 500); };
+const filteredHistoryTasks = computed(() => { return historyTasks.value; });
+const fetchHistory = async () => {
+try {
+const params = new URLSearchParams();
+if (historyFilter.status) params.append('status', historyFilter.status);
+if (historyFilter.search) params.append('search', historyFilter.search);
+params.append('page', '1'); params.append('page_size', '1000');
+const res = await fetch('/api/tasks?' + params.toString());
+const data = await res.json();
+if (res.ok) { historyTasks.value = (data.tasks || []).map(item => ({ ...item, showCrops: false, cropsLoaded: false, crops: [] })); }
+} catch (e) { ElementPlus.ElMessage.error('获取历史失败: ' + e.message); }
+};
+const deleteTask = async (taskId) => { try { const res = await fetch('/api/tasks/' + taskId, { method: 'DELETE' }); if (res.ok) { fetchHistory(); ElementPlus.ElMessage.success('删除成功'); } else throw new Error('删除失败'); } catch (e) { ElementPlus.ElMessage.error('删除失败: ' + e.message); } };
+const cleanupCompleted = async () => { try { const res = await fetch('/api/tasks/cleanup', { method: 'POST' }); if (res.ok) { fetchHistory(); ElementPlus.ElMessage.success('清理完成'); } else throw new Error('清理失败'); } catch (e) { ElementPlus.ElMessage.error('清理失败: ' + e.message); } };
+const downloadHistoryFile = (taskId, type) => { window.open('/api/download/' + taskId + '/' + type, '_blank'); };
+const toggleCrops = async (item) => {
+item.showCrops = !item.showCrops;
+if (item.showCrops && !item.cropsLoaded) {
+try {
+const res = await fetch('/api/tasks/' + item.task_id + '/crops');
+const data = await res.json();
+if (res.ok) { item.crops = data.crops || []; item.cropsLoaded = true; }
+} catch (e) { ElementPlus.ElMessage.error('获取裁剪记录失败: ' + e.message); }
+}
+};
+const downloadCropFile = (cropId) => { window.open('/api/download/crop/' + cropId, '_blank'); };
+const reprocessTask = async (taskId) => { try { const res = await fetch('/api/tasks/' + taskId + '/reprocess', { method: 'POST' }); const data = await res.json(); if (!res.ok) throw new Error(data.detail || '重新制作失败'); steps.forEach(s => { s.active = false; s.completed = false; }); task.value = { task_id: taskId, status: 'processing', step_progress: 0, current_step: '准备开始' }; elapsedSec.value = 0; etaSec.value = null; selectedFile.value = null; fileList.value = []; activeTab.value = 'main'; startPolling(taskId); ElementPlus.ElMessage.success('已开始重新制作'); } catch (e) { ElementPlus.ElMessage.error('重新制作失败: ' + e.message); } };
+
+/* ========== 裁剪 ========== */
+const cropDialogVisible = ref(false);
+const currentCropTaskId = ref('');
+const cropSegments = ref([{ start: '00:03:04', end: '00:04:08' }]);
+const cropSubmitting = ref(false);
+const cropMode = ref('remove');
+const openCropDialog = (taskId) => { currentCropTaskId.value = taskId; cropSegments.value = [{ start: '00:03:04', end: '00:04:08' }]; cropMode.value = 'remove'; cropDialogVisible.value = true; };
+const addCropSegment = () => { cropSegments.value.push({ start: '', end: '' }); };
+const removeCropSegment = (idx) => { cropSegments.value.splice(idx, 1); };
+const submitCrop = async () => {
+if (!currentCropTaskId.value || cropSegments.value.some(seg => !seg.start || !seg.end)) { ElementPlus.ElMessage.warning('请填写完整的时间段'); return; }
+cropSubmitting.value = true;
+try {
+const res = await fetch('/api/tasks/' + currentCropTaskId.value + '/crop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ segments: cropSegments.value, mode: cropMode.value }) });
+if (res.ok) { ElementPlus.ElMessage.success('裁剪任务已提交'); cropDialogVisible.value = false; fetchHistory(); startCropPolling(currentCropTaskId.value); } else { const err = await res.json(); throw new Error(err.detail || '提交失败'); }
+} catch (e) { ElementPlus.ElMessage.error('提交失败: ' + e.message); }
+finally { cropSubmitting.value = false; }
+};
+let cropPollTimer = null;
+const startCropPolling = (taskId) => {
+if (cropPollTimer) clearInterval(cropPollTimer);
+let lastCropCount = 0;
+cropPollTimer = setInterval(async () => {
+try {
+const res = await fetch('/api/tasks/' + taskId + '/crops');
+const data = await res.json();
+if (!res.ok) return;
+const crops = data.crops || [];
+const allDone = crops.length > 0 && crops.every(c => c.status === 'success' || c.status === 'failed');
+const item = historyTasks.value.find(t => t.task_id === taskId);
+if (item && item.showCrops) { item.crops = crops; item.cropsLoaded = true; }
+if (allDone) {
+clearInterval(cropPollTimer);
+cropPollTimer = null;
+const successCount = crops.filter(c => c.status === 'success').length;
+if (successCount > lastCropCount) ElementPlus.ElMessage.success(successCount + ' 个裁剪任务已完成');
+}
+lastCropCount = crops.filter(c => c.status === 'success').length;
+} catch (e) { console.error('裁剪轮询出错', e); }
+}, 2000);
+};
+
+/* ========== 配置 ========== */
+const configForm = reactive({
+features: { enable_asr_prompt: true, enable_ad_detection: false, enable_summary: false, enable_titles: false },
+ollama: { analysis: { model: 'qwen2:7b', temperature: 0.1 }, translate: { model: 'qwen2:7b', temperature: 0.1 } },
+translate_backend: 'ollama',
+online_api: { 
+provider: 'openai', // 🆕 默认厂商
+base_url: 'https://api.openai.com', api_key: '', model: 'gpt-3.5-turbo', batch_mode: false, batch_size: 5, fallbacks: [] 
+},
+local_translation: { model_dir: '', topic: '' },
+font: { zh: 'SimHei', en: 'Arial', scale: 1.0 }
+});
+
+const topicPreset = ref('');
+const configSaved = ref(false);
+
+// 🆕 厂商预设配置
+const PROVIDER_PRESETS = {
+'openai': { base_url: 'https://api.openai.com', model: 'gpt-3.5-turbo' },
+'deepseek': { base_url: 'https://api.deepseek.com', model: 'deepseek-chat' },
+'siliconflow': { base_url: 'https://api.siliconflow.cn', model: 'deepseek-ai/DeepSeek-V3' },
+'zhipu': { base_url: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4' },
+'qwen': { base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-turbo' },
+'moonshot': { base_url: 'https://api.moonshot.cn', model: 'moonshot-v1-8k' },
+};
+
+// 🆕 主 API 厂商切换逻辑
+const onProviderChange = (val) => {
+const preset = PROVIDER_PRESETS[val];
+if (preset) {
+configForm.online_api.base_url = preset.base_url;
+configForm.online_api.model = preset.model;
+ElementPlus.ElMessage.success(`已切换至 ${val}，URL 与模型已更新`);
+}
+};
+
+// 🆕 备用 API 厂商切换逻辑
+const onFallbackProviderChange = (val, idx) => {
+const preset = PROVIDER_PRESETS[val];
+if (preset) {
+const fb = configForm.online_api.fallbacks[idx];
+if (fb) {
+fb.base_url = preset.base_url;
+fb.model = preset.model;
+ElementPlus.ElMessage.success(`备用 ${idx + 1} 已切换至 ${val}，URL 与模型已更新`);
+}
+}
+};
+
+const onTopicChange = (val) => {
+const topics = { football: 'football match analysis tactics players', f1: 'F1 racing driver circuit lap time strategy', basketball: 'basketball game players tactics score', esports: 'esports game tournament players strategy' };
+if (val && val !== 'custom') configForm.local_translation.topic = topics[val];
+else if (val === 'custom') configForm.local_translation.topic = '';
+else configForm.local_translation.topic = '';
+};
+const addFallback = () => {
+if (!configForm.online_api.fallbacks) configForm.online_api.fallbacks = [];
+configForm.online_api.fallbacks.push({ name: '备用' + (configForm.online_api.fallbacks.length + 1), provider: 'openai', base_url: '', api_key: '', model: '' });
+};
+const removeFallback = (idx) => { configForm.online_api.fallbacks.splice(idx, 1); };
+const saveConfig = async () => {
+try {
+const res = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(configForm) });
+if (res.ok) { configSaved.value = true; ElementPlus.ElMessage.success('配置保存成功'); setTimeout(() => { configSaved.value = false; }, 2000); } else throw new Error('保存失败');
+} catch (e) { ElementPlus.ElMessage.error('保存失败: ' + e.message); }
+};
+const onBeforeUnload = (e) => { if (isUploadingFlag) { e.preventDefault(); e.returnValue = '视频正在上传中，离开可能导致上传中断。是否继续？'; } };
+onMounted(async () => {
+await uploadDB.init();
+await loadPendingUploads();
+fetchHistory();
+fetch('/api/config').then(res => res.json()).then(data => { Object.assign(configForm, data); if (!configForm.online_api.fallbacks) configForm.online_api.fallbacks = []; }).catch(() => {});
+window.addEventListener('beforeunload', onBeforeUnload);
+});
+onUnmounted(() => { stopPolling(); stopElapsedTimer(); if (cropPollTimer) clearInterval(cropPollTimer); window.removeEventListener('beforeunload', onBeforeUnload); });
+
+return { activeTab, fileList, selectedFile, uploading, task, elapsedSec, etaSec, steps, onFileChange, uploadVideo, resetMain, formatTime, formatFileSize, uploadChunkProgress, pendingUploads, cancelPendingUpload, historyFilter, filteredHistoryTasks, fetchHistory, deleteTask, cleanupCompleted, downloadHistoryFile, toggleCrops, downloadCropFile, reprocessTask, cropDialogVisible, currentCropTaskId, cropSegments, cropSubmitting, cropMode, openCropDialog, addCropSegment, removeCropSegment, submitCrop, configForm, topicPreset, configSaved, onTopicChange, saveConfig, addFallback, removeFallback, formatDate, onSearchInput, advancedCollapsed, subtitleFile, subtitleFileList, onSubtitleChange, skippedWhisper, onProviderChange, onFallbackProviderChange };
+}
+});
+app.use(ElementPlus);
+app.mount('#app');
+</script>
 </body>
 </html>

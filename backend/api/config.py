@@ -59,12 +59,14 @@ class ApiFallbackItem(BaseModel):
     name: str = "备用API"
     base_url: str = ""
     api_key: str = ""
+    provider: str = "openai"  # 🆕 新增：备用 API 也支持指定厂商
     model: str = ""
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     enable_thinking: Optional[bool] = None
 
 class OnlineApiConfig(BaseModel):
+    provider: str = "openai"  # 🆕 新增：默认厂商为 OpenAI 兼容
     base_url: str = ""
     api_key: str = ""
     model: str = "gpt-3.5-turbo"
