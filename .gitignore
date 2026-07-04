@@ -11,3 +11,4 @@ build/
 test_video/
 config.json
 tools_code
+frontend-app/node_modules/
