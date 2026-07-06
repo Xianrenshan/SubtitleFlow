@@ -1,5 +1,5 @@
 /**
- * app.js - 核心整合入口文件，组配所有的 Composable 模块
+ * app.js - 核心整合入口文件，注册异步模板组件，实现状态分发
  */
 import { uploadDB } from './db.js';
 import { formatTime, formatFileSize, formatDate } from './utils.js';
@@ -8,9 +8,63 @@ import { useUpload } from './modules/useUpload.js';
 import { useHistory } from './modules/useHistory.js';
 import { useCrop } from './modules/useCrop.js';
 
-const { ref, reactive, onMounted, onUnmounted } = window.Vue;
+const { ref, reactive, onMounted, onUnmounted, defineAsyncComponent, provide, inject } = window.Vue;
+
+/* ==================== 1. 动态读取外部 HTML 的组件声明 ==================== */
+
+const UploadTab = defineAsyncComponent(async () => {
+    const html = await fetch('./templates/upload-tab.html').then(r => r.text());
+    return {
+        template: html,
+        setup() {
+            const store = inject('store');
+            return { ...store };
+        }
+    };
+});
+
+const HistoryTab = defineAsyncComponent(async () => {
+    const html = await fetch('./templates/history-tab.html').then(r => r.text());
+    return {
+        template: html,
+        setup() {
+            const store = inject('store');
+            return { ...store };
+        }
+    };
+});
+
+const ConfigTab = defineAsyncComponent(async () => {
+    const html = await fetch('./templates/config-tab.html').then(r => r.text());
+    return {
+        template: html,
+        setup() {
+            const store = inject('store');
+            return { ...store };
+        }
+    };
+});
+
+const CropDialog = defineAsyncComponent(async () => {
+    const html = await fetch('./templates/crop-dialog.html').then(r => r.text());
+    return {
+        template: html,
+        setup() {
+            const store = inject('store');
+            return { ...store };
+        }
+    };
+});
+
+/* ==================== 2. 主 App 创建与挂载 ==================== */
 
 const app = window.Vue.createApp({
+    components: {
+        UploadTab,
+        HistoryTab,
+        ConfigTab,
+        CropDialog
+    },
     setup() {
         const activeTab = ref('main');
         const task = ref(null);
@@ -30,7 +84,7 @@ const app = window.Vue.createApp({
             { label: '字幕压制', active: false, completed: false },
         ]);
 
-        /* ========== 任务全局时间及状态轮询核心 ========== */
+        /* ========== 任务全局状态轮询 ========== */
         const startPolling = (taskId) => {
             stopPolling();
             pollingTimer = setInterval(async () => {
@@ -99,7 +153,7 @@ const app = window.Vue.createApp({
             etaSec.value = null; 
             skippedWhisper.value = false; 
             
-            // 重置子模块中的上传部分状态
+            // 响应修改子模块中的上传状态
             fileList.value = [];
             selectedFile.value = null;
             advancedCollapsed.value = false;
@@ -109,15 +163,34 @@ const app = window.Vue.createApp({
             steps.forEach(s => { s.active = false; s.completed = false; }); 
         };
 
-        /* ========== 模块实例化与装配 ========== */
+        /* ========== 组合式业务逻辑装配 ========== */
         const configModule = useConfig();
         const uploadModule = useUpload(task, startPolling);
         const historyModule = useHistory(task, steps, startPolling, resetMain, activeTab);
         const cropModule = useCrop(historyModule.fetchHistory, historyModule.historyTasks);
 
-        // 统一解构出需要被 resetMain 主动写回更新的上传模块属性
         const { fileList, selectedFile, advancedCollapsed, subtitleFile, subtitleFileList } = uploadModule;
         const { fetchHistory } = historyModule;
+
+        // 全局依赖注入：拼装所有需要被组件模板访问的数据与接口
+        const rootState = {
+            activeTab,
+            task,
+            elapsedSec,
+            etaSec,
+            steps,
+            skippedWhisper,
+            resetMain,
+            formatTime,
+            formatFileSize,
+            formatDate,
+            ...configModule,
+            ...uploadModule,
+            ...historyModule,
+            ...cropModule
+        };
+
+        provide('store', rootState);
 
         onMounted(async () => {
             await uploadDB.init();
@@ -135,20 +208,7 @@ const app = window.Vue.createApp({
         });
 
         return {
-            activeTab,
-            task,
-            elapsedSec,
-            etaSec,
-            steps,
-            skippedWhisper,
-            resetMain,
-            formatTime,
-            formatFileSize,
-            formatDate,
-            ...configModule,
-            ...uploadModule,
-            ...historyModule,
-            ...cropModule
+            activeTab
         };
     }
 });

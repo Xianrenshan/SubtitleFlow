@@ -1,0 +1,75 @@
+<div class="config-cards">
+  <div class="config-card">
+    <h3>功能开关</h3>
+    <div class="config-row"> <span>ASR 提示词生成</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">基于标题预测专有名词，提高识别准确率</span> <el-switch v-model="configForm.features.enable_asr_prompt" /> </div> </div>
+    <div class="config-row"> <span>广告检测</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">自动识别并标记广告片段</span> <el-switch v-model="configForm.features.enable_ad_detection" /> </div> </div>
+    <div class="config-row"> <span>内容摘要</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">生成视频内容中文摘要</span> <el-switch v-model="configForm.features.enable_summary" /> </div> </div>
+    <div class="config-row"> <span>推荐标题</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">生成 5 个吸引人的中文标题</span> <el-switch v-model="configForm.features.enable_titles" /> </div> </div>
+  </div>
+  <div class="config-card">
+    <h3>模型设置</h3>
+    <div class="config-row"><span>分析模型</span><el-input v-model="configForm.ollama.analysis.model" style="width: 200px;" /></div>
+    <div class="config-row"><span>分析温度</span><el-slider v-model="configForm.ollama.analysis.temperature" :min="0" :max="1" :step="0.05" show-input style="width: 200px;" /></div>
+    <div class="config-row"><span>翻译模型</span><el-input v-model="configForm.ollama.translate.model" style="width: 200px;" /></div>
+    <div class="config-row"><span>翻译温度</span><el-slider v-model="configForm.ollama.translate.temperature" :min="0" :max="1" :step="0.05" show-input style="width: 200px;" /></div>
+  </div>
+  <div class="config-card">
+    <h3>翻译后端</h3>
+    <div class="config-row"> <span>翻译方式</span> <el-select v-model="configForm.translate_backend" style="width: 200px;"> <el-option label="Ollama (本地模型)" value="ollama" /> <el-option label="本地 Transformers (HY-MT1.5)" value="local_transformers" /> <el-option label="在线 API (OpenAI 兼容)" value="online_api" /> </el-select> </div>
+    <template v-if="configForm.translate_backend === 'online_api'">
+      <!-- 🆕 新增：厂商选择下拉菜单 -->
+      <div class="config-row">
+        <span>API 厂商</span>
+        <el-select v-model="configForm.online_api.provider" placeholder="选择厂商" @change="onProviderChange" style="width: 200px;">
+          <el-option label="OpenAI (原生)" value="openai" />
+          <el-option label="DeepSeek (深度求索)" value="deepseek" />
+          <el-option label="SiliconFlow (硅基流动)" value="siliconflow" />
+          <el-option label="智谱 AI (GLM)" value="zhipu" />
+          <el-option label="通义千问" value="qwen" />
+          <el-option label="Moonshot (Kimi)" value="moonshot" />
+        </el-select>
+        <span class="desc" style="margin-left: 10px; font-weight: normal; color: var(--text-tertiary);">选择后将自动填充 URL 与模型</span>
+      </div>
+
+      <div class="config-row"><span>API 地址</span><el-input v-model="configForm.online_api.base_url" placeholder="https://api.openai.com" style="width: 300px;" /></div>
+      <div class="config-row"><span>API 密钥</span><el-input v-model="configForm.online_api.api_key" type="password" show-password placeholder="sk-..." style="width: 300px;" /></div>
+      <div class="config-row"><span>模型名称</span><el-input v-model="configForm.online_api.model" placeholder="gpt-3.5-turbo / deepseek-chat" style="width: 200px;" /></div>
+      <div class="config-row"> <span>翻译模式</span> <el-select v-model="configForm.online_api.batch_mode" style="width: 150px;"> <el-option label="逐句翻译（稳定）" :value="false" /> <el-option label="批量翻译（快速）" :value="true" /> </el-select> </div>
+      <div class="config-row" v-if="configForm.online_api.batch_mode"><span>每批句数</span><el-slider v-model="configForm.online_api.batch_size" :min="1" :max="20" :step="1" show-input style="width: 200px;" /></div>
+      <div style="margin-top: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"> <span style="font-weight: 600; font-size: 15px;">备用 API（额度耗尽时自动切换）</span> <el-button type="primary" plain size="small" @click="addFallback">+ 添加备用</el-button> </div>
+        <div v-for="(fb, idx) in (configForm.online_api.fallbacks || [])" :key="idx" class="fallback-card">
+          <div class="fallback-header"> <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">备用 API {{ idx + 1 }}</span> <el-button type="danger" plain size="small" @click="removeFallback(idx)">移除</el-button> </div>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div class="config-row"><span>名称</span><el-input v-model="fb.name" placeholder="备用1" style="width: 200px;" /></div>
+            <!-- 🆕 新增：备用 API 厂商选择 -->
+            <div class="config-row">
+              <span>API 厂商</span>
+              <el-select v-model="fb.provider" placeholder="选择厂商" @change="(val) => onFallbackProviderChange(val, idx)" style="width: 200px;">
+                <el-option label="OpenAI (原生)" value="openai" />
+                <el-option label="DeepSeek (深度求索)" value="deepseek" />
+                <el-option label="SiliconFlow (硅基流动)" value="siliconflow" />
+                <el-option label="智谱 AI (GLM)" value="zhipu" />
+                <el-option label="通义千问" value="qwen" />
+                <el-option label="Moonshot (Kimi)" value="moonshot" />
+              </el-select>
+            </div>
+            <div class="config-row"><span>API 地址</span><el-input v-model="fb.base_url" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" style="width: 300px;" /></div>
+            <div class="config-row"><span>API 密钥</span><el-input v-model="fb.api_key" type="password" show-password placeholder="sk-..." style="width: 300px;" /></div>
+            <div class="config-row"><span>模型名称</span><el-input v-model="fb.model" placeholder="qwen-turbo" style="width: 200px;" /></div>
+          </div>
+        </div>
+        <div v-if="!configForm.online_api.fallbacks || configForm.online_api.fallbacks.length === 0" style="font-size: 13px; color: var(--text-secondary); text-align: center; padding: 12px;"> 暂无备用 API，主 API 额度耗尽时任务将失败 </div>
+      </div>
+    </template>
+    <div class="config-row" v-if="configForm.translate_backend === 'local_transformers'"><span>模型路径</span><el-input v-model="configForm.local_translation.model_dir" placeholder="E:\modelscope\..." style="width: 300px;" /></div>
+    <div class="config-row" v-if="configForm.translate_backend === 'local_transformers'"> <span>视频主题</span> <div style="display: flex; gap: 8px; align-items: center;"> <el-select v-model="topicPreset" @change="onTopicChange" style="width: 150px;"> <el-option label="无主题" value="" /> <el-option label="足球" value="football" /> <el-option label="F1赛车" value="f1" /> <el-option label="篮球" value="basketball" /> <el-option label="电竞" value="esports" /> <el-option label="自定义" value="custom" /> </el-select> <el-input v-if="topicPreset === 'custom'" v-model="configForm.local_translation.topic" placeholder="英文主题，如 football tactical analysis" style="width: 220px;" /> </div> </div>
+  </div>
+  <div class="config-card">
+    <h3>字幕样式</h3>
+    <div class="config-row"><span>中文字体</span><el-input v-model="configForm.font.zh" style="width: 200px;" /></div>
+    <div class="config-row"><span>英文字体</span><el-input v-model="configForm.font.en" style="width: 200px;" /></div>
+    <div class="config-row"><span>字体缩放</span><el-slider v-model="configForm.font.scale" :min="0.8" :max="1.5" :step="0.05" show-input style="width: 200px;" /></div>
+  </div>
+  <el-button type="primary" @click="saveConfig" size="large" style="align-self: flex-end;"> {{ configSaved ? '已保存' : '保存配置' }} </el-button>
+</div>

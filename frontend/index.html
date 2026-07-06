@@ -9,7 +9,6 @@
 <!-- 自定义样式 -->
 <link rel="stylesheet" href="./css/style.css">
 <base target="_blank">
-<base target="_blank">
 </head>
 <body>
 <div id="app">
@@ -20,238 +19,23 @@
 <el-tabs v-model="activeTab" type="border-card">
 <!-- ==================== 主流程 ==================== -->
 <el-tab-pane label="处理中心" name="main">
-<div class="glass-card" v-if="!task">
-<el-upload class="upload-zone" drag :auto-upload="false" :on-change="onFileChange" accept="video/*" :limit="1" v-model:file-list="fileList">
-<div style="font-size: 32px; margin-bottom: 12px;">📁</div>
-<div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">拖拽视频文件到此处</div>
-<div style="font-size: 13px; color: var(--text-secondary);">支持 MP4、WebM、MKV 等格式，或点击选择文件</div>
-</el-upload>
-<div class="upload-file-info" v-if="selectedFile"> 已选择：{{ selectedFile.name }} ({{ formatFileSize(selectedFile.size) }}) </div>
-<!-- 高级选项：上传字幕加速 -->
-<div class="advanced-options-panel">
-<el-button type="info" text @click="advancedCollapsed = !advancedCollapsed"> 高级选项 {{ advancedCollapsed ? '▲' : '▼' }} </el-button>
-<div v-if="advancedCollapsed" class="subtitle-upload-box">
-<el-upload drag :auto-upload="false" :on-change="onSubtitleChange" accept=".srt" :limit="1" v-model:file-list="subtitleFileList" style="width: 100%;">
-<div style="font-size: 24px; margin-bottom: 8px;">📄</div>
-<div style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">上传英文字幕</div>
-<div style="font-size: 12px; color: var(--text-secondary);">已有英文字幕？上传即可跳过耗时语音识别（提速 80%）</div>
-</el-upload>
-<div v-if="subtitleFile" class="subtitle-success-hint">✓ 已选择字幕: {{ subtitleFile.name }}</div>
-</div>
-</div>
-<!-- 分片上传进度 -->
-<div class="upload-progress-bar" v-if="uploading && uploadChunkProgress.total > 0">
-<el-progress :percentage="Math.round((uploadChunkProgress.uploaded / uploadChunkProgress.total) * 100)" :stroke-width="8" :format="() => '上传分片 ' + uploadChunkProgress.uploaded + '/' + uploadChunkProgress.total" />
-</div>
-<el-button class="action-btn" :disabled="!selectedFile || uploading" @click="uploadVideo" style="margin-top: 20px;"> {{ uploading ? '上传中...' : '开始处理' }} </el-button>
-<!-- 续传提示 -->
-<div v-if="pendingUploads.length > 0 && !selectedFile && !uploading" style="margin-top: 16px; text-align: center;">
-<el-alert type="info" :closable="false" style="margin-bottom: 12px;">
-<template #title>发现 {{ pendingUploads.length }} 个未完成的上传</template>
-</el-alert>
-<div v-for="pu in pendingUploads" :key="pu.uploadId" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;"> {{ pu.fileName }} ({{ formatFileSize(pu.fileSize) }}) <el-button type="danger" text size="small" @click="cancelPendingUpload(pu.uploadId)">取消</el-button> </div>
-<div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;"> 请重新选择相同文件，系统将自动跳过已上传部分 </div>
-</div>
-</div>
-<!-- 处理中 / 完成 / 失败 状态 -->
-<div v-if="task" :class="['glass-card', task.status === 'success' ? 'success-card' : '', task.status === 'failed' ? 'error-card' : '']">
-<div class="step-timeline" v-if="task.status === 'processing' || task.status === 'pending'">
-<div v-for="(step, idx) in steps" :key="idx" :class="['step-item', { active: step.active, completed: step.completed }]">
-<div class="step-circle">{{ step.completed ? '✓' : idx + 1 }}</div>
-<div class="step-label">{{ step.label }}</div>
-<div class="step-line"></div>
-</div>
-</div>
-<div v-if="task.status === 'processing' || task.status === 'pending'" class="dashboard">
-<div class="progress-ring">
-<el-progress type="circle" :percentage="Math.round(task.step_progress || 0)" :stroke-width="12" :width="180" color="url(#gradient)">
-<template #default>
-<div class="progress-center">
-<div class="progress-percent">{{ Math.round(task.step_progress || 0) }}%</div>
-<div class="progress-step-name">{{ task.current_step || '准备中' }}</div>
-<div v-if="skippedWhisper" style="font-size: 12px; color: var(--success); margin-top: 4px;">⚡ 检测到外部字幕，已跳过语音识别</div>
-</div>
-</template>
-</el-progress>
-<svg width="0" height="0">
-<defs>
-<linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-<stop offset="0%" stop-color="#06b6d4" />
-<stop offset="100%" stop-color="#3b82f6" />
-</linearGradient>
-</defs>
-</svg>
-</div>
-<div class="time-cards">
-<div class="time-card">
-<div class="label">已用时间</div>
-<div class="value">{{ formatTime(elapsedSec) }}</div>
-</div>
-<div class="time-card">
-<div class="label">预计剩余</div>
-<div class="value">{{ etaSec != null && etaSec > 0 ? formatTime(etaSec) : '--:--' }}</div>
-</div>
-</div>
-</div>
-<div v-if="task.status === 'success'">
-<div style="text-align: center; padding: 20px 0;">
-<div style="font-size: 48px;">✅</div>
-<h2 style="margin: 10px 0; color: var(--success);">处理成功！</h2>
-<p style="color: var(--text-secondary);">你的视频已处理完毕，请下载文件</p>
-</div>
-<div class="download-grid">
-<a :href="'/api/download/' + task.task_id + '/video'" class="download-item" v-if="task.download_urls && task.download_urls.video"> <span style="font-size: 28px;">🎬</span><span>压制视频</span> </a>
-<a :href="'/api/download/' + task.task_id + '/zh_srt'" class="download-item" v-if="task.download_urls && task.download_urls.zh_srt"> <span style="font-size: 28px;">🇨🇳</span><span>中文字幕</span> </a>
-<a :href="'/api/download/' + task.task_id + '/en_srt'" class="download-item" v-if="task.download_urls && task.download_urls.en_srt"> <span style="font-size: 28px;">🇬🇧</span><span>英文字幕</span> </a>
-<a :href="'/api/download/' + task.task_id + '/meta'" class="download-item" v-if="task.download_urls && task.download_urls.meta"> <span style="font-size: 28px;">📄</span><span>元数据</span> </a>
-</div>
-<div style="text-align: center; margin-top: 24px;"> <el-button @click="resetMain" type="info" text>处理另一个视频</el-button> </div>
-</div>
-<div v-if="task.status === 'failed'">
-<div style="text-align: center; padding: 20px 0;">
-<div style="font-size: 48px;">❌</div>
-<h2 style="margin: 10px 0; color: var(--danger);">处理失败</h2>
-</div>
-<div class="error-message">{{ task.error_message }}</div>
-<div style="text-align: center;"> <el-button @click="resetMain" type="primary">重新上传</el-button> </div>
-</div>
-</div>
+  <!-- 动态组件：会自动去 templates/upload-tab.html 异步加载 -->
+  <upload-tab></upload-tab>
 </el-tab-pane>
 <!-- ==================== 历史记录 ==================== -->
 <el-tab-pane label="任务历史" name="history">
-<div class="glass-card">
-<div class="history-toolbar">
-<el-radio-group v-model="historyFilter.status" @change="fetchHistory" class="history-status-tabs" size="small"> <el-radio-button label="">全部</el-radio-button> <el-radio-button label="pending">准备中</el-radio-button> <el-radio-button label="processing">处理中</el-radio-button> <el-radio-button label="success">成功</el-radio-button> <el-radio-button label="failed">失败</el-radio-button> </el-radio-group>
-<el-input v-model="historyFilter.search" placeholder="搜索文件名..." clearable @input="onSearchInput" @clear="fetchHistory" class="history-search-input" />
-<el-button @click="fetchHistory" type="primary" plain>刷新</el-button>
-<el-popconfirm title="确定清除所有已完成和失败的任务？" @confirm="cleanupCompleted"> <template #reference> <el-button type="danger" plain>一键清理</el-button> </template> </el-popconfirm>
-</div>
-<div class="history-grid">
-<div v-for="item in filteredHistoryTasks" :key="item.task_id" class="history-card">
-<div class="card-header">
-<div class="card-filename" :title="item.original_filename"> {{ item.original_filename || item.task_id }} </div>
-<div class="card-status"> <el-tag :type="item.status === 'success' ? 'success' : item.status === 'failed' ? 'danger' : 'warning'" size="small" effect="dark"> {{ item.status === 'success' ? '成功' : item.status === 'failed' ? '失败' : item.status === 'pending' ? '准备中' : '处理中' }} </el-tag> </div>
-</div>
-<div class="card-meta"> <span>{{ formatDate(item.created_at) }}</span> <span v-if="item.file_size">{{ formatFileSize(item.file_size) }}</span> </div>
-<div class="card-actions">
-<template v-if="item.status === 'success'"> <el-button size="small" @click="downloadHistoryFile(item.task_id, 'video')" v-if="item.output_video_path">🎬 原版</el-button> <el-button size="small" @click="downloadHistoryFile(item.task_id, 'zh_srt')" v-if="item.output_zh_srt">🇨🇳 中字</el-button> <el-button size="small" @click="downloadHistoryFile(item.task_id, 'en_srt')" v-if="item.output_en_srt">🇬🇧 英字</el-button> <el-button size="small" @click="downloadHistoryFile(item.task_id, 'meta')" v-if="item.output_meta">📄 元数据</el-button> <el-button size="small" type="primary" plain @click="openCropDialog(item.task_id)">✂️ 裁剪</el-button> </template>
-<el-button size="small" type="warning" plain @click="reprocessTask(item.task_id)" v-if="item.status === 'success' || item.status === 'failed'"> 重新制作 </el-button>
-<el-button size="small" type="danger" @click="deleteTask(item.task_id)">删除</el-button>
-<el-button size="small" type="info" text @click="toggleCrops(item)" v-if="item.status === 'success'" style="margin-left: auto;"> {{ item.showCrops ? '收起裁剪版 ▲' : '查看裁剪版 ▼' }} </el-button>
-</div>
-<div v-if="item.showCrops" class="crop-list">
-<div v-if="!item.cropsLoaded" style="font-size:12px; color:var(--text-secondary);">加载中...</div>
-<div v-else-if="item.crops.length === 0" style="font-size:12px; color:var(--text-secondary);">暂无裁剪记录</div>
-<div v-else v-for="crop in item.crops" :key="crop.crop_id" class="crop-item">
-<div class="crop-info">
-<span>裁剪片段数: {{ crop.segments ? crop.segments.length : 0 }}</span>
-<el-tag :type="crop.status === 'success' ? 'success' : crop.status === 'failed' ? 'danger' : 'warning'" size="small"> {{ crop.status === 'success' ? '成功' : crop.status === 'failed' ? '失败' : '处理中' }} </el-tag>
-</div>
-<div class="crop-action">
-<el-button v-if="crop.status === 'success'" size="small" type="primary" link @click="downloadCropFile(crop.crop_id)">下载</el-button>
-<div v-if="crop.status === 'failed'" style="font-size: 12px; color: var(--danger);" :title="crop.error_message">失败详情</div>
-</div>
-</div>
-</div>
-</div>
-<div v-if="filteredHistoryTasks.length === 0" style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);"> 暂无历史任务 </div>
-</div>
-</div>
+  <!-- 动态组件：会自动去 templates/history-tab.html 异步加载 -->
+  <history-tab></history-tab>
 </el-tab-pane>
 <!-- ==================== 配置 ==================== -->
 <el-tab-pane label="系统配置" name="config">
-<div class="config-cards">
-<div class="config-card">
-<h3>功能开关</h3>
-<div class="config-row"> <span>ASR 提示词生成</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">基于标题预测专有名词，提高识别准确率</span> <el-switch v-model="configForm.features.enable_asr_prompt" /> </div> </div>
-<div class="config-row"> <span>广告检测</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">自动识别并标记广告片段</span> <el-switch v-model="configForm.features.enable_ad_detection" /> </div> </div>
-<div class="config-row"> <span>内容摘要</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">生成视频内容中文摘要</span> <el-switch v-model="configForm.features.enable_summary" /> </div> </div>
-<div class="config-row"> <span>推荐标题</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">生成 5 个吸引人的中文标题</span> <el-switch v-model="configForm.features.enable_titles" /> </div> </div>
-</div>
-<div class="config-card">
-<h3>模型设置</h3>
-<div class="config-row"><span>分析模型</span><el-input v-model="configForm.ollama.analysis.model" style="width: 200px;" /></div>
-<div class="config-row"><span>分析温度</span><el-slider v-model="configForm.ollama.analysis.temperature" :min="0" :max="1" :step="0.05" show-input style="width: 200px;" /></div>
-<div class="config-row"><span>翻译模型</span><el-input v-model="configForm.ollama.translate.model" style="width: 200px;" /></div>
-<div class="config-row"><span>翻译温度</span><el-slider v-model="configForm.ollama.translate.temperature" :min="0" :max="1" :step="0.05" show-input style="width: 200px;" /></div>
-</div>
-<div class="config-card">
-<h3>翻译后端</h3>
-<div class="config-row"> <span>翻译方式</span> <el-select v-model="configForm.translate_backend" style="width: 200px;"> <el-option label="Ollama (本地模型)" value="ollama" /> <el-option label="本地 Transformers (HY-MT1.5)" value="local_transformers" /> <el-option label="在线 API (OpenAI 兼容)" value="online_api" /> </el-select> </div>
-<template v-if="configForm.translate_backend === 'online_api'">
-<!-- 🆕 新增：厂商选择下拉菜单 -->
-<div class="config-row">
-<span>API 厂商</span>
-<el-select v-model="configForm.online_api.provider" placeholder="选择厂商" @change="onProviderChange" style="width: 200px;">
-<el-option label="OpenAI (原生)" value="openai" />
-<el-option label="DeepSeek (深度求索)" value="deepseek" />
-<el-option label="SiliconFlow (硅基流动)" value="siliconflow" />
-<el-option label="智谱 AI (GLM)" value="zhipu" />
-<el-option label="通义千问" value="qwen" />
-<el-option label="Moonshot (Kimi)" value="moonshot" />
-</el-select>
-<span class="desc" style="margin-left: 10px; font-weight: normal; color: var(--text-tertiary);">选择后将自动填充 URL 与模型</span>
-</div>
-
-<div class="config-row"><span>API 地址</span><el-input v-model="configForm.online_api.base_url" placeholder="https://api.openai.com" style="width: 300px;" /></div>
-<div class="config-row"><span>API 密钥</span><el-input v-model="configForm.online_api.api_key" type="password" show-password placeholder="sk-..." style="width: 300px;" /></div>
-<div class="config-row"><span>模型名称</span><el-input v-model="configForm.online_api.model" placeholder="gpt-3.5-turbo / deepseek-chat" style="width: 200px;" /></div>
-<div class="config-row"> <span>翻译模式</span> <el-select v-model="configForm.online_api.batch_mode" style="width: 150px;"> <el-option label="逐句翻译（稳定）" :value="false" /> <el-option label="批量翻译（快速）" :value="true" /> </el-select> </div>
-<div class="config-row" v-if="configForm.online_api.batch_mode"><span>每批句数</span><el-slider v-model="configForm.online_api.batch_size" :min="1" :max="20" :step="1" show-input style="width: 200px;" /></div>
-<div style="margin-top: 16px;">
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"> <span style="font-weight: 600; font-size: 15px;">备用 API（额度耗尽时自动切换）</span> <el-button type="primary" plain size="small" @click="addFallback">+ 添加备用</el-button> </div>
-<div v-for="(fb, idx) in (configForm.online_api.fallbacks || [])" :key="idx" class="fallback-card">
-<div class="fallback-header"> <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">备用 API {{ idx + 1 }}</span> <el-button type="danger" plain size="small" @click="removeFallback(idx)">移除</el-button> </div>
-<div style="display: flex; flex-direction: column; gap: 10px;">
-<div class="config-row"><span>名称</span><el-input v-model="fb.name" placeholder="备用1" style="width: 200px;" /></div>
-<!-- 🆕 新增：备用 API 厂商选择 -->
-<div class="config-row">
-<span>API 厂商</span>
-<el-select v-model="fb.provider" placeholder="选择厂商" @change="(val) => onFallbackProviderChange(val, idx)" style="width: 200px;">
-<el-option label="OpenAI (原生)" value="openai" />
-<el-option label="DeepSeek (深度求索)" value="deepseek" />
-<el-option label="SiliconFlow (硅基流动)" value="siliconflow" />
-<el-option label="智谱 AI (GLM)" value="zhipu" />
-<el-option label="通义千问" value="qwen" />
-<el-option label="Moonshot (Kimi)" value="moonshot" />
-</el-select>
-</div>
-<div class="config-row"><span>API 地址</span><el-input v-model="fb.base_url" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" style="width: 300px;" /></div>
-<div class="config-row"><span>API 密钥</span><el-input v-model="fb.api_key" type="password" show-password placeholder="sk-..." style="width: 300px;" /></div>
-<div class="config-row"><span>模型名称</span><el-input v-model="fb.model" placeholder="qwen-turbo" style="width: 200px;" /></div>
-</div>
-</div>
-<div v-if="!configForm.online_api.fallbacks || configForm.online_api.fallbacks.length === 0" style="font-size: 13px; color: var(--text-secondary); text-align: center; padding: 12px;"> 暂无备用 API，主 API 额度耗尽时任务将失败 </div>
-</div>
-</template>
-<div class="config-row" v-if="configForm.translate_backend === 'local_transformers'"><span>模型路径</span><el-input v-model="configForm.local_translation.model_dir" placeholder="E:\modelscope\..." style="width: 300px;" /></div>
-<div class="config-row" v-if="configForm.translate_backend === 'local_transformers'"> <span>视频主题</span> <div style="display: flex; gap: 8px; align-items: center;"> <el-select v-model="topicPreset" @change="onTopicChange" style="width: 150px;"> <el-option label="无主题" value="" /> <el-option label="足球" value="football" /> <el-option label="F1赛车" value="f1" /> <el-option label="篮球" value="basketball" /> <el-option label="电竞" value="esports" /> <el-option label="自定义" value="custom" /> </el-select> <el-input v-if="topicPreset === 'custom'" v-model="configForm.local_translation.topic" placeholder="英文主题，如 football tactical analysis" style="width: 220px;" /> </div> </div>
-</div>
-<div class="config-card">
-<h3>字幕样式</h3>
-<div class="config-row"><span>中文字体</span><el-input v-model="configForm.font.zh" style="width: 200px;" /></div>
-<div class="config-row"><span>英文字体</span><el-input v-model="configForm.font.en" style="width: 200px;" /></div>
-<div class="config-row"><span>字体缩放</span><el-slider v-model="configForm.font.scale" :min="0.8" :max="1.5" :step="0.05" show-input style="width: 200px;" /></div>
-</div>
-<el-button type="primary" @click="saveConfig" size="large" style="align-self: flex-end;"> {{ configSaved ? '已保存' : '保存配置' }} </el-button>
-</div>
+  <!-- 动态组件：会自动去 templates/config-tab.html 异步加载 -->
+  <config-tab></config-tab>
 </el-tab-pane>
 </el-tabs>
 
-<!-- 裁剪对话框 -->
-<el-dialog v-model="cropDialogVisible" title="视频片段裁剪" width="520px">
-<el-radio-group v-model="cropMode" style="margin-bottom: 16px; display: flex;"> <el-radio-button label="remove">删除片段（去掉广告）</el-radio-button> <el-radio-button label="keep">保留片段（拼接精华）</el-radio-button> </el-radio-group>
-<div style="margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;"> <template v-if="cropMode === 'remove'"> 请输入你要<strong style="color:var(--danger)">删除</strong>的视频片段（如广告段）。<br> 系统会自动保留剩余内容，无缝拼接成新视频。 </template> <template v-else> 请输入你要<strong style="color:var(--accent-cyan)">保留</strong>的视频片段。<br> 最终会将所有保留段按照顺序拼接到一起。 </template> </div>
-<div v-for="(seg, idx) in cropSegments" :key="idx" style="background: var(--bg-secondary); border: 1px solid var(--border); padding: 16px; border-radius: var(--radius-md); margin-bottom: 12px;">
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;"> <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">{{ cropMode === 'remove' ? '删除段' : '保留段' }} {{ idx + 1 }}</span> <el-button type="danger" plain size="small" @click="removeCropSegment(idx)" :disabled="cropSegments.length <= 1">移除</el-button> </div>
-<div style="display: flex; flex-direction: column; gap: 10px;">
-<div> <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">起始时间（如 00:03:04）</div> <el-input v-model="seg.start" placeholder="00:03:04" size="large" /> </div>
-<div> <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">结束时间（如 00:04:08）</div> <el-input v-model="seg.end" placeholder="00:04:08" size="large" /> </div>
-</div>
-</div>
-<el-button type="primary" plain size="small" @click="addCropSegment" style="width: 100%; margin-top: 6px; border-style: dashed;"> + 添加{{ cropMode === 'remove' ? '删除' : '保留' }}时间段 </el-button>
-<template #footer> <span class="dialog-footer"> <el-button @click="cropDialogVisible = false">取消</el-button> <el-button type="primary" :loading="cropSubmitting" @click="submitCrop">提交裁剪后台任务</el-button> </span> </template>
-</el-dialog>
+<!-- 动态弹窗组件：会自动去 templates/crop-dialog.html 异步加载 -->
+<crop-dialog></crop-dialog>
 </div>
 <!-- vue 与 element-plus -->
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>

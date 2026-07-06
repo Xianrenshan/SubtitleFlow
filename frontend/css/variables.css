@@ -1,0 +1,52 @@
+:root {
+  /* Background */
+  --bg-primary: #ffffff;
+  --bg-secondary: #fafafa;
+  --bg-tertiary: #f5f5f5;
+  /* Surface */
+  --surface: #ffffff;
+  --surface-hover: #fafafa;
+  /* Border */
+  --border: #eaeaea;
+  --border-strong: #ddd;
+  /* Text */
+  --text-primary: #000000;
+  --text-secondary: #666666;
+  --text-tertiary: #888888;
+  --text-disabled: #999999;
+  /* Brand / Accent */
+  --accent: #000000;
+  --accent-hover: #333333;
+  --accent-text: #ffffff;
+  --link: #0070f3;
+  /* Status */
+  --success: #0070f3;
+  --warning: #f5a623;
+  --danger: #e00;
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  /* Shadow */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 8px rgba(0,0,0,0.04);
+  /* Font */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'Geist Mono', 'SF Mono', 'Fira Code', 'Courier New', monospace;
+  /* Legacy variable mappings (for inline style compatibility) */
+  --glass-bg: var(--surface);
+  --glass-border: var(--border);
+  --shadow-glass: var(--shadow-sm);
+  --accent-cyan: var(--text-primary);
+  --accent-blue: var(--link);
+}

@@ -1,0 +1,38 @@
+<div class="glass-card">
+  <div class="history-toolbar">
+    <el-radio-group v-model="historyFilter.status" @change="fetchHistory" class="history-status-tabs" size="small"> <el-radio-button label="">全部</el-radio-button> <el-radio-button label="pending">准备中</el-radio-button> <el-radio-button label="processing">处理中</el-radio-button> <el-radio-button label="success">成功</el-radio-button> <el-radio-button label="failed">失败</el-radio-button> </el-radio-group>
+    <el-input v-model="historyFilter.search" placeholder="搜索文件名..." clearable @input="onSearchInput" @clear="fetchHistory" class="history-search-input" />
+    <el-button @click="fetchHistory" type="primary" plain>刷新</el-button>
+    <el-popconfirm title="确定清除所有已完成和失败的任务？" @confirm="cleanupCompleted"> <template #reference> <el-button type="danger" plain>一键清理</el-button> </template> </el-popconfirm>
+  </div>
+  <div class="history-grid">
+    <div v-for="item in filteredHistoryTasks" :key="item.task_id" class="history-card">
+      <div class="card-header">
+        <div class="card-filename" :title="item.original_filename"> {{ item.original_filename || item.task_id }} </div>
+        <div class="card-status"> <el-tag :type="item.status === 'success' ? 'success' : item.status === 'failed' ? 'danger' : 'warning'" size="small" effect="dark"> {{ item.status === 'success' ? '成功' : item.status === 'failed' ? '失败' : item.status === 'pending' ? '准备中' : '处理中' }} </el-tag> </div>
+      </div>
+      <div class="card-meta"> <span>{{ formatDate(item.created_at) }}</span> <span v-if="item.file_size">{{ formatFileSize(item.file_size) }}</span> </div>
+      <div class="card-actions">
+        <template v-if="item.status === 'success'"> <el-button size="small" @click="downloadHistoryFile(item.task_id, 'video')" v-if="item.output_video_path">🎬 原版</el-button> <el-button size="small" @click="downloadHistoryFile(item.task_id, 'zh_srt')" v-if="item.output_zh_srt">🇨🇳 中字</el-button> <el-button size="small" @click="downloadHistoryFile(item.task_id, 'en_srt')" v-if="item.output_en_srt">🇬🇧 英字</el-button> <el-button size="small" @click="downloadHistoryFile(item.task_id, 'meta')" v-if="item.output_meta">📄 元数据</el-button> <el-button size="small" type="primary" plain @click="openCropDialog(item.task_id)">✂️ 裁剪</el-button> </template>
+        <el-button size="small" type="warning" plain @click="reprocessTask(item.task_id)" v-if="item.status === 'success' || item.status === 'failed'"> 重新制作 </el-button>
+        <el-button size="small" type="danger" @click="deleteTask(item.task_id)">删除</el-button>
+        <el-button size="small" type="info" text @click="toggleCrops(item)" v-if="item.status === 'success'" style="margin-left: auto;"> {{ item.showCrops ? '收起裁剪版 ▲' : '查看裁剪版 ▼' }} </el-button>
+      </div>
+      <div v-if="item.showCrops" class="crop-list">
+        <div v-if="!item.cropsLoaded" style="font-size:12px; color:var(--text-secondary);">加载中...</div>
+        <div v-else-if="item.crops.length === 0" style="font-size:12px; color:var(--text-secondary);">暂无裁剪记录</div>
+        <div v-else v-for="crop in item.crops" :key="crop.crop_id" class="crop-item">
+          <div class="crop-info">
+            <span>裁剪片段数: {{ crop.segments ? crop.segments.length : 0 }}</span>
+            <el-tag :type="crop.status === 'success' ? 'success' : crop.status === 'failed' ? 'danger' : 'warning'" size="small"> {{ crop.status === 'success' ? '成功' : crop.status === 'failed' ? '失败' : '处理中' }} </el-tag>
+          </div>
+          <div class="crop-action">
+            <el-button v-if="crop.status === 'success'" size="small" type="primary" link @click="downloadCropFile(crop.crop_id)">下载</el-button>
+            <div v-if="crop.status === 'failed'" style="font-size: 12px; color: var(--danger);" :title="crop.error_message">失败详情</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="filteredHistoryTasks.length === 0" style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);"> 暂无历史任务 </div>
+  </div>
+</div>

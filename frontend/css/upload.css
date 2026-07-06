@@ -1,0 +1,18 @@
+/* Upload styles */
+.upload-zone { border: 1px dashed var(--border); border-radius: var(--radius-lg); padding: 48px; text-align: center; transition: all 0.15s ease; cursor: pointer; background: var(--bg-secondary); }
+.upload-zone:hover { border-color: var(--text-primary); background: var(--bg-tertiary); }
+.upload-zone .el-upload-dragger { background: transparent; border: none; width: 100%; }
+.upload-file-info { margin-top: 16px; color: var(--text-secondary); font-size: 14px; }
+.advanced-options-panel { margin-top: 12px; text-align: left; }
+.subtitle-upload-box { margin-top: 12px; padding: 16px; border: 1px dashed var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); }
+.subtitle-upload-box .el-upload-dragger { background: transparent; border: none; width: 100%; padding: 16px; }
+.subtitle-success-hint { margin-top: 8px; font-size: 13px; color: var(--success); }
+
+/* Progress bar styles */
+.upload-progress-bar { margin-top: 16px; }
+.upload-progress-bar .el-progress__text { color: var(--text-secondary) !important; font-size: 12px !important; }
+.el-progress-bar__outer { background-color: var(--border); border-radius: var(--radius-sm); }
+.el-progress-bar__inner { background-color: var(--accent); border-radius: var(--radius-sm); }
+.el-progress__text { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
+.el-progress-circle__track { stroke: var(--border); }
+.el-progress-circle__path { stroke: var(--accent) !important; }

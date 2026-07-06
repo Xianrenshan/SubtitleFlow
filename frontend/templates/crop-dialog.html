@@ -1,0 +1,13 @@
+<el-dialog v-model="cropDialogVisible" title="视频片段裁剪" width="520px">
+  <el-radio-group v-model="cropMode" style="margin-bottom: 16px; display: flex;"> <el-radio-button label="remove">删除片段（去掉广告）</el-radio-button> <el-radio-button label="keep">保留片段（拼接精华）</el-radio-button> </el-radio-group>
+  <div style="margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;"> <template v-if="cropMode === 'remove'"> 请输入你要<strong style="color:var(--danger)">删除</strong>的视频片段（如广告段）。<br> 系统会自动保留剩余内容，无缝拼接成新视频。 </template> <template v-else> 请输入你要<strong style="color:var(--accent-cyan)">保留</strong>的视频片段。<br> 最终会将所有保留段按照顺序拼接到一起。 </template> </div>
+  <div v-for="(seg, idx) in cropSegments" :key="idx" style="background: var(--bg-secondary); border: 1px solid var(--border); padding: 16px; border-radius: var(--radius-md); margin-bottom: 12px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;"> <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">{{ cropMode === 'remove' ? '删除段' : '保留段' }} {{ idx + 1 }}</span> <el-button type="danger" plain size="small" @click="removeCropSegment(idx)" :disabled="cropSegments.length <= 1">移除</el-button> </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div> <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">起始时间（如 00:03:04）</div> <el-input v-model="seg.start" placeholder="00:03:04" size="large" /> </div>
+      <div> <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">结束时间（如 00:04:08）</div> <el-input v-model="seg.end" placeholder="00:04:08" size="large" /> </div>
+    </div>
+  </div>
+  <el-button type="primary" plain size="small" @click="addCropSegment" style="width: 100%; margin-top: 6px; border-style: dashed;"> + 添加{{ cropMode === 'remove' ? '删除' : '保留' }}时间段 </el-button>
+  <template #footer> <span class="dialog-footer"> <el-button @click="cropDialogVisible = false">取消</el-button> <el-button type="primary" :loading="cropSubmitting" @click="submitCrop">提交裁剪后台任务</el-button> </span> </template>
+</el-dialog>

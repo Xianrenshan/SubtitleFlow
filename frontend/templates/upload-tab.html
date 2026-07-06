@@ -1,0 +1,98 @@
+<div>
+  <div class="glass-card" v-if="!task">
+    <el-upload class="upload-zone" drag :auto-upload="false" :on-change="onFileChange" accept="video/*" :limit="1" v-model:file-list="fileList">
+      <div style="font-size: 32px; margin-bottom: 12px;">📁</div>
+      <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">拖拽视频文件到此处</div>
+      <div style="font-size: 13px; color: var(--text-secondary);">支持 MP4、WebM、MKV 等格式，或点击选择文件</div>
+    </el-upload>
+    <div class="upload-file-info" v-if="selectedFile"> 已选择：{{ selectedFile.name }} ({{ formatFileSize(selectedFile.size) }}) </div>
+    <!-- 高级选项：上传字幕加速 -->
+    <div class="advanced-options-panel">
+      <el-button type="info" text @click="advancedCollapsed = !advancedCollapsed"> 高级选项 {{ advancedCollapsed ? '▲' : '▼' }} </el-button>
+      <div v-if="advancedCollapsed" class="subtitle-upload-box">
+        <el-upload drag :auto-upload="false" :on-change="onSubtitleChange" accept=".srt" :limit="1" v-model:file-list="subtitleFileList" style="width: 100%;">
+          <div style="font-size: 24px; margin-bottom: 8px;">📄</div>
+          <div style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">上传英文字幕</div>
+          <div style="font-size: 12px; color: var(--text-secondary);">已有英文字幕？上传即可跳过耗时语音识别（提速 80%）</div>
+        </el-upload>
+        <div v-if="subtitleFile" class="subtitle-success-hint">✓ 已选择字幕: {{ subtitleFile.name }}</div>
+      </div>
+    </div>
+    <!-- 分片上传进度 -->
+    <div class="upload-progress-bar" v-if="uploading && uploadChunkProgress.total > 0">
+      <el-progress :percentage="Math.round((uploadChunkProgress.uploaded / uploadChunkProgress.total) * 100)" :stroke-width="8" :format="() => '上传分片 ' + uploadChunkProgress.uploaded + '/' + uploadChunkProgress.total" />
+    </div>
+    <el-button class="action-btn" :disabled="!selectedFile || uploading" @click="uploadVideo" style="margin-top: 20px;"> {{ uploading ? '上传中...' : '开始处理' }} </el-button>
+    <!-- 续传提示 -->
+    <div v-if="pendingUploads.length > 0 && !selectedFile && !uploading" style="margin-top: 16px; text-align: center;">
+      <el-alert type="info" :closable="false" style="margin-bottom: 12px;">
+        <template #title>发现 {{ pendingUploads.length }} 个未完成的上传</template>
+      </el-alert>
+      <div v-for="pu in pendingUploads" :key="pu.uploadId" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;"> {{ pu.fileName }} ({{ formatFileSize(pu.fileSize) }}) <el-button type="danger" text size="small" @click="cancelPendingUpload(pu.uploadId)">取消</el-button> </div>
+      <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;"> 请重新选择相同文件，系统将自动跳过已上传部分 </div>
+    </div>
+  </div>
+  <!-- 处理中 / 完成 / 失败 状态 -->
+  <div v-if="task" :class="['glass-card', task.status === 'success' ? 'success-card' : '', task.status === 'failed' ? 'error-card' : '']">
+    <div class="step-timeline" v-if="task.status === 'processing' || task.status === 'pending'">
+      <div v-for="(step, idx) in steps" :key="idx" :class="['step-item', { active: step.active, completed: step.completed }]">
+        <div class="step-circle">{{ step.completed ? '✓' : idx + 1 }}</div>
+        <div class="step-label">{{ step.label }}</div>
+        <div class="step-line"></div>
+      </div>
+    </div>
+    <div v-if="task.status === 'processing' || task.status === 'pending'" class="dashboard">
+      <div class="progress-ring">
+        <el-progress type="circle" :percentage="Math.round(task.step_progress || 0)" :stroke-width="12" :width="180" color="url(#gradient)">
+          <template #default>
+            <div class="progress-center">
+              <div class="progress-percent">{{ Math.round(task.step_progress || 0) }}%</div>
+              <div class="progress-step-name">{{ task.current_step || '准备中' }}</div>
+              <div v-if="skippedWhisper" style="font-size: 12px; color: var(--success); margin-top: 4px;">⚡ 检测到外部字幕，已跳过语音识别</div>
+            </div>
+          </template>
+        </el-progress>
+        <svg width="0" height="0">
+          <defs>
+            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#06b6d4" />
+              <stop offset="100%" stop-color="#3b82f6" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="time-cards">
+        <div class="time-card">
+          <div class="label">已用时间</div>
+          <div class="value">{{ formatTime(elapsedSec) }}</div>
+        </div>
+        <div class="time-card">
+          <div class="label">预计剩余</div>
+          <div class="value">{{ etaSec != null && etaSec > 0 ? formatTime(etaSec) : '--:--' }}</div>
+        </div>
+      </div>
+    </div>
+    <div v-if="task.status === 'success'">
+      <div style="text-align: center; padding: 20px 0;">
+        <div style="font-size: 48px;">✅</div>
+        <h2 style="margin: 10px 0; color: var(--success);">处理成功！</h2>
+        <p style="color: var(--text-secondary);">你的视频已处理完毕，请下载文件</p>
+      </div>
+      <div class="download-grid">
+        <a :href="'/api/download/' + task.task_id + '/video'" class="download-item" v-if="task.download_urls && task.download_urls.video"> <span style="font-size: 28px;">🎬</span><span>压制视频</span> </a>
+        <a :href="'/api/download/' + task.task_id + '/zh_srt'" class="download-item" v-if="task.download_urls && task.download_urls.zh_srt"> <span style="font-size: 28px;">🇨🇳</span><span>中文字幕</span> </a>
+        <a :href="'/api/download/' + task.task_id + '/en_srt'" class="download-item" v-if="task.download_urls && task.download_urls.en_srt"> <span style="font-size: 28px;">🇬🇧</span><span>英文字幕</span> </a>
+        <a :href="'/api/download/' + task.task_id + '/meta'" class="download-item" v-if="task.download_urls && task.download_urls.meta"> <span style="font-size: 28px;">📄</span><span>元数据</span> </a>
+      </div>
+      <div style="text-align: center; margin-top: 24px;"> <el-button @click="resetMain" type="info" text>处理另一个视频</el-button> </div>
+    </div>
+    <div v-if="task.status === 'failed'">
+      <div style="text-align: center; padding: 20px 0;">
+        <div style="font-size: 48px;">❌</div>
+        <h2 style="margin: 10px 0; color: var(--danger);">处理失败</h2>
+      </div>
+      <div class="error-message">{{ task.error_message }}</div>
+      <div style="text-align: center;"> <el-button @click="resetMain" type="primary">重新上传</el-button> </div>
+    </div>
+  </div>
+</div>
