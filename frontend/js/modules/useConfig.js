@@ -13,7 +13,8 @@ export function useConfig() {
             base_url: 'https://api.openai.com', api_key: '', model: 'gpt-3.5-turbo', batch_mode: false, batch_size: 5, fallbacks: [] 
         },
         local_translation: { model_dir: '', topic: '' },
-        font: { zh: 'SimHei', en: 'Arial', scale: 1.0 }
+        font: { zh: 'SimHei', en: 'Arial', scale: 1.0 },
+        intro: { enable: false, video_path: '' }
     });
 
     const topicPreset = ref('');

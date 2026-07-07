@@ -233,8 +233,8 @@ def time_str_to_seconds(time_str):
 
 def burn_video_with_progress(video_in, ass_in, logo_in, video_out, total_duration,
                              ffmpeg_path, preview_mode=False, preview_duration=30,
-                             progress_callback=None):
-    print("\n🚀 开始压制...")
+                             progress_callback=None, intro_path=None, video_height=1080):
+    print("\n🚀 开始压制与合并处理...")
     ass_path_clean = str(Path(ass_in).as_posix()).replace(":", "\:")
 
     cmd = [ffmpeg_path, "-y", "-v", "error", "-stats"]
@@ -243,9 +243,37 @@ def burn_video_with_progress(video_in, ass_in, logo_in, video_out, total_duratio
 
     cmd.extend([
         "-i", video_in,
-        "-i", logo_in,
-        "-filter_complex",
-        f"[1:v]scale=iw*0.15:-1[logo];[0:v][logo]overlay=main_w-overlay_w-20:20,ass='{ass_path_clean}'",
+        "-i", logo_in
+    ])
+
+    if intro_path:
+        cmd.extend(["-i", intro_path])
+        width = int(video_height * 16 / 9)
+        if width % 2 != 0:
+            width += 1
+        h_even = video_height if video_height % 2 == 0 else video_height + 1
+        
+        # 滤镜编排：片头视频等比例缩放、补黑边对齐至主视频尺寸，并将音轨重采样对齐为 AAC 44.1kHz 音频流后合并
+        filter_complex = (
+            f"[1:v]scale=iw*0.15:-1[logo];"
+            f"[0:v][logo]overlay=main_w-overlay_w-20:20,ass='{ass_path_clean}'[subbed_main];"
+            f"[2:v]scale={width}:{h_even}:force_original_aspect_ratio=decrease,pad={width}:{h_even}:(ow-iw)/2:(oh-ih)/2,setsar=1[intro_v];"
+            f"[2:a]aresample=async=1:osr=44100[intro_a];"
+            f"[0:a]aresample=async=1:osr=44100[main_a];"
+            f"[intro_v][intro_a][subbed_main][main_a]concat=n=2:v=1:a=1[out_v][out_a]"
+        )
+        cmd.extend([
+            "-filter_complex", filter_complex,
+            "-map", "[out_v]",
+            "-map", "[out_a]"
+        ])
+    else:
+        filter_complex = f"[1:v]scale=iw*0.15:-1[logo];[0:v][logo]overlay=main_w-overlay_w-20:20,ass='{ass_path_clean}'"
+        cmd.extend([
+            "-filter_complex", filter_complex
+        ])
+
+    cmd.extend([
         "-c:v", "libx264", "-preset", "medium", "-crf", "20",
         "-profile:v", "high", "-level", "4.1", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
@@ -282,6 +310,8 @@ def burn_video_with_progress(video_in, ass_in, logo_in, video_out, total_duratio
             if match and progress_duration > 0:
                 current_seconds = time_str_to_seconds(match.group(1))
                 percent = int((current_seconds / progress_duration) * 100)
+                if percent > 100:
+                    percent = 100
                 if percent != last_percent:
                     last_percent = percent
                     if progress_callback:
@@ -290,22 +320,24 @@ def burn_video_with_progress(video_in, ass_in, logo_in, video_out, total_duratio
                         progress_callback(percent, eta)
                     bar_len = 30
                     filled = int(bar_len * current_seconds // progress_duration)
+                    if filled > bar_len:
+                        filled = bar_len
                     bar = '█' * filled + '-' * (bar_len - filled)
                     sys.stdout.write(f"\r[{bar}] {percent:.1f}%")
                     sys.stdout.flush()
     print()
 
     if process.returncode == 0:
-        print(f"✅ 压制完成！耗时 {int(time.time() - start_time)} 秒")
+        print(f"✅ 压制与片头合并完成！耗时 {int(time.time() - start_time)} 秒")
         return True
     else:
-        print("❌ 压制失败")
+        print("❌ 压制与片头合并失败")
         return False
 
 
 def burn_subtitles(video_path, en_srt_path, zh_srt_path, output_dir=None,
                    meta_path=None, config=None, progress_callback=None,
-                   words_json_path=None):  # 🆕 新增参数，预留词级数据
+                   words_json_path=None):  # 新增参数，预留词级数据
     if output_dir is None:
         output_dir = video_path.parent / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -318,6 +350,25 @@ def burn_subtitles(video_path, en_srt_path, zh_srt_path, output_dir=None,
     height, duration = get_video_info(str(video_path), ffprobe_path)
     print(f"📹 视频: {video_path.name} ({height}p, {int(duration)}秒)")
 
+    # 校验并读取片头配置
+    intro_cfg = config.get("intro", {}) if config else {}
+    intro_enabled = intro_cfg.get("enable", False)
+    intro_path = intro_cfg.get("video_path", "")
+
+    valid_intro_path = None
+    intro_duration = 0.0
+    if intro_enabled and intro_path:
+        p = Path(intro_path)
+        if p.exists() and p.is_file():
+            valid_intro_path = str(p)
+            try:
+                _, intro_duration = get_video_info(valid_intro_path, ffprobe_path)
+                print(f"[burn] 检测到有效片头，将在开头合并: {p.name} ({int(intro_duration)}秒)")
+            except Exception as e:
+                print(f"[burn] ⚠️ 读取片头视频信息失败: {e}")
+        else:
+            print(f"[burn] ⚠️ 片头视频路径不存在: {intro_path}，将自动跳过片头合并流程。")
+
     ass_path = output_dir / "temp_bilingual.ass"
     create_adaptive_ass(str(zh_srt_path), str(en_srt_path), height, str(ass_path), config)
 
@@ -325,9 +376,11 @@ def burn_subtitles(video_path, en_srt_path, zh_srt_path, output_dir=None,
     safe_base_name = config.get("safe_base_name", video_path.stem)
     out_video = output_dir / f"{safe_base_name}_subtitled.mp4"
 
+    # 将合并后的总时长和片头路径传入压制线程
     success = burn_video_with_progress(
         str(video_path), str(ass_path), logo_path, str(out_video),
-        duration, ffmpeg_path, False, 30, progress_callback
+        duration + intro_duration, ffmpeg_path, False, 30, progress_callback,
+        intro_path=valid_intro_path, video_height=height
     )
 
     if ass_path.exists():
