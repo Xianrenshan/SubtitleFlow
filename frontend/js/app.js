@@ -198,6 +198,27 @@ const app = window.Vue.createApp({
             fetchHistory();
             configModule.loadConfig();
             window.addEventListener('beforeunload', uploadModule.handleBeforeUnload);
+
+            // 自动检测并加载后台运行中的任务
+            try {
+                const activeRes = await fetch('/api/tasks?status=pending,processing&page=1&page_size=1');
+                if (activeRes.ok) {
+                    const data = await activeRes.json();
+                    if (data.tasks && data.tasks.length > 0) {
+                        const activeTask = data.tasks[0];
+                        task.value = {
+                            task_id: activeTask.task_id,
+                            status: activeTask.status,
+                            current_step: activeTask.current_step || '准备开始',
+                            step_progress: activeTask.progress || 0
+                        };
+                        activeTab.value = 'main';
+                        startPolling(activeTask.task_id);
+                    }
+                }
+            } catch (e) {
+                console.warn('自动检测后台任务失败:', e);
+            }
         });
 
         onUnmounted(() => { 
