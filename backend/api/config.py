@@ -5,7 +5,6 @@ from backend.config import config_manager
 
 router = APIRouter()
 
-# 和 config.json 的结构对齐，使用嵌套模型
 class FeaturesConfig(BaseModel):
     enable_asr_prompt: bool = True
     enable_ad_detection: bool = False
@@ -59,14 +58,14 @@ class ApiFallbackItem(BaseModel):
     name: str = "备用API"
     base_url: str = ""
     api_key: str = ""
-    provider: str = "openai"  # 新增：备用 API 也支持指定厂商
+    provider: str = "openai"
     model: str = ""
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     enable_thinking: Optional[bool] = None
 
 class OnlineApiConfig(BaseModel):
-    provider: str = "openai"  # 新增：默认厂商为 OpenAI 兼容
+    provider: str = "openai"
     base_url: str = ""
     api_key: str = ""
     model: str = "gpt-3.5-turbo"
@@ -80,8 +79,13 @@ class OnlineApiConfig(BaseModel):
     time_window: float = 25.0
     fallbacks: Optional[List[ApiFallbackItem]] = None
 
-class SubtitleConfig(BaseModel):
-    max_clause_chars: int = 50
+class SubtitleReconstructionConfig(BaseModel):
+    punctuation_model_dir: str = ""  # BERT 标点恢复模型本地路径
+    spacy_model_name: str = "en_core_web_trf" # spaCy Transformer 模型名称
+    max_chars_per_line: int = 42  # 单行最大英文字符数
+    max_duration_sec: float = 7.0  # 单条字幕最大持续时间
+    merge_gap_threshold: float = 0.5  # 短句合并的最大时间间隔(秒)
+    micro_gap_ms: int = 100  # 拆分长句时注入的微缝隙(毫秒)
 
 class IntroConfig(BaseModel):
     enable: bool = False
@@ -96,9 +100,8 @@ class ConfigUpdate(BaseModel):
     translate_backend: Optional[str] = "ollama"
     local_translation: Optional[LocalTranslationConfig] = None
     online_api: Optional[OnlineApiConfig] = None
-    subtitle: Optional[SubtitleConfig] = None
+    subtitle_reconstruction: Optional[SubtitleReconstructionConfig] = None
     intro: Optional[IntroConfig] = None
-
 
 @router.get("/config")
 async def get_config():
