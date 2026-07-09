@@ -11,6 +11,7 @@ class FeaturesConfig(BaseModel):
     enable_summary: bool = False
     enable_titles: bool = False
     enable_tags: bool = False
+    enable_denoise: bool = False  # 🆕 新增：声学人声净化前处理开关
 
 class OllamaModelConfig(BaseModel):
     model: str

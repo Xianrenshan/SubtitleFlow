@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import re
+import subprocess
 import stable_whisper
 import pysbd
 
@@ -178,9 +179,6 @@ def find_hard_splits(words: list, start_tok: int, end_tok: int, max_chars: int, 
     return find_hard_splits(words, start_tok, best_idx, max_chars, max_line_length, max_cps) + [best_idx] + find_hard_splits(words, best_idx + 1, end_tok, max_chars, max_line_length, max_cps)
 
 
-# --------------------------------------------------------------------------- #
-# 4. 善后粘合机制 (后处理合并、软换行与时间轴归一化)
-# --------------------------------------------------------------------------- #
 def merge_short_segments(result_obj, max_chars_line: int = 50, max_line_length: int = 70, max_cps: float = 18.0, max_duration: float = 5.0):
     """
     后处理短句合并：
@@ -230,7 +228,7 @@ def soft_wrap_segments(result_obj, max_chars_line: int = 50, max_line_length: in
     后处理软换行：
     视觉排版优化，不改变任何时序。对确有展示双行需求的字幕进行排版美化打分折行。
     """
-    for segment in result.segments:
+    for segment in result_obj.segments:
         # 清除单词里可能残留的无规则换行符，并抹去两端杂乱空格
         for w in segment.words:
             w.word = w.word.replace('\n', '')
@@ -238,7 +236,6 @@ def soft_wrap_segments(result_obj, max_chars_line: int = 50, max_line_length: in
         # 3.1 重构干净文本
         slice_text = "".join(w.word for w in segment.words).strip()
         words_list = slice_text.split()
-        lines_count = len(_greedy_lines(words_list, max_chars=slice_text.split() if words_list else [])) # 简单估算
         
         # 重新评估行数
         lines_count = len(_greedy_lines(words_list, max_chars=max_chars_line)) if words_list else 0
@@ -252,7 +249,7 @@ def soft_wrap_segments(result_obj, max_chars_line: int = 50, max_line_length: in
                 left_text = "".join(w.word for w in segment.words[:idx + 1]).strip()
                 right_text = "".join(w.word for w in segment.words[idx + 1:]).strip()
                 
-                if len(left_text) > max_chars or len(right_text) > max_chars:
+                if len(left_text) > max_chars_line or len(right_text) > max_chars_line:
                     continue
                     
                 score = abs(len(left_text) - len(right_text))
@@ -345,36 +342,116 @@ def run_whisper(video_path: Path, config: dict, prompt_text: str = "",
     min_gap = subtitle_cfg.get("min_gap", 0.1)                # 句间物理隔离
     max_lead_out = subtitle_cfg.get("max_lead_out", 0.4)      # 发音结束后的合理留白
 
+    # =============================================================================
+    # 🆕 新增：DeepFilterNet3 智能人声分离声学预处理链路
+    # =============================================================================
+    features = config.get("features", {})
+    enable_denoise = features.get("enable_denoise", False)
+
+    transcribe_source = str(video_path)
+    temp_raw_wav = None
+    temp_clean_wav = None
+
+    if enable_denoise:
+        print("[run_whisper] ⚙️ 声学人声净化前处理开启，正在拦截原始音频轨道进行降噪过滤...")
+        try:
+            # 1. 尝试动态导入 DeepFilterNet 核心接口
+            try:
+                from df.enhance import enhance, init_df, load_audio, save_audio
+            except ImportError:
+                print("[run_whisper] ❌ 导入 deepfilternet 失败！请确保本地终端执行了 `pip install deepfilternet`。正在退回原始轨道识别。")
+                raise ImportError("deepfilternet not installed")
+
+            # 2. 构造临时文件的输出路径
+            temp_raw_wav = output_dir / f"temp_{safe_base_name}_raw_extract.wav"
+            temp_clean_wav = output_dir / f"temp_{safe_base_name}_purified.wav"
+
+            # 3. 提取原视频的音频流到 48kHz 单声道 PCM wav 容器
+            ffmpeg_path = config.get("ffmpeg", {}).get("executable", "ffmpeg")
+            print(f"[run_whisper] 正在使用 FFmpeg 提取 48kHz 原始音频 -> {temp_raw_wav.name}")
+            cmd_extract = [
+                ffmpeg_path, "-y", "-v", "error",
+                "-i", str(video_path),
+                "-vn", "-acodec", "pcm_s16le",
+                "-ar", "48000", "-ac", "1",
+                str(temp_raw_wav)
+            ]
+            subprocess.run(cmd_extract, check=True)
+
+            # 4. 执行 DeepFilterNet3 人声还原增强
+            print("[run_whisper] 正在实例化 DeepFilterNet3 神经网络进行高保真降噪...")
+            model, df_state, _ = init_df()
+            audio, _ = load_audio(str(temp_raw_wav), sr=df_state.sr())
+            enhanced = enhance(model, df_state, audio)
+            save_audio(str(temp_clean_wav), enhanced, df_state.sr())
+
+            # 5. 替换最终输入源
+            transcribe_source = str(temp_clean_wav)
+            print("[run_whisper] ✅ 人声净化完毕，已将 ASR 音频指针安全重定向至去噪后的干声轨道。")
+
+        except Exception as e:
+            print(f"[run_whisper] ⚠️ 降噪前处理链条出现异常: {e}，正在平滑退回到原始视频模式直接识别。")
+            # 异常发生时，如果产生部分临时垃圾文件，立即在异常区预清理
+            if temp_raw_wav and temp_raw_wav.exists():
+                try:
+                    temp_raw_wav.unlink()
+                except:
+                    pass
+            if temp_clean_wav and temp_clean_wav.exists():
+                try:
+                    temp_clean_wav.unlink()
+                except:
+                    pass
+            transcribe_source = str(video_path)
+
     # 5.2 实例化本地 faster_whisper 
-    model = stable_whisper.load_faster_whisper(
-        whisper_cfg["model_dir"],
-        device=whisper_cfg["device"],
-        compute_type=whisper_cfg["compute_type"]
-    )
+    try:
+        model = stable_whisper.load_faster_whisper(
+            whisper_cfg["model_dir"],
+            device=whisper_cfg["device"],
+            compute_type=whisper_cfg["compute_type"]
+        )
 
-    def custom_progress_callback(seek: float, total: float):
-        if total > 0:
-            percent = int((seek / total) * 100)
-            if percent > 100:
-                percent = 100
-        else:
-            percent = 0
+        def custom_progress_callback(seek: float, total: float):
+            if total > 0:
+                percent = int((seek / total) * 100)
+                if percent > 100:
+                    percent = 100
+            else:
+                percent = 0
 
-        if progress_dict is not None:
-            progress_dict["percent"] = percent
-        if progress_callback:
-            progress_callback(percent, None)
+            if progress_dict is not None:
+                progress_dict["percent"] = percent
+            if progress_callback:
+                progress_callback(percent, None)
 
-    # 5.3 激活模型，执行稳定版本转写
-    result = model.transcribe_stable(
-        str(video_path),
-        beam_size=whisper_cfg.get("beam_size", 5),
-        initial_prompt=prompt_text,
-        language=whisper_cfg.get("language", "en"),
-        regroup=False,  # 完全关闭默认机制，交由我们的混合决策排版脑处理
-        condition_on_previous_text=False,
-        progress_callback=custom_progress_callback
-    )
+        # 5.3 激活模型，执行稳定版本转写
+        result = model.transcribe_stable(
+            transcribe_source,   # 🆕 使用重定向后的音频文件或原视频
+            beam_size=whisper_cfg.get("beam_size", 5),
+            initial_prompt=prompt_text,
+            language=whisper_cfg.get("language", "en"),
+            regroup=False,  # 完全关闭默认机制，交由我们的混合决策排版脑处理
+            condition_on_previous_text=False,
+            progress_callback=custom_progress_callback
+        )
+    finally:
+        # =============================================================================
+        # 🆕 强力安全保障：转写完成后，进入 finally 块强制清理硬盘上的两轨临时波形
+        # =============================================================================
+        if temp_raw_wav and temp_raw_wav.exists():
+            try:
+                temp_raw_wav.unlink()
+                print("[run_whisper] 🗑️ 已清理前处理临时提取原始音轨。")
+            except Exception as e:
+                print(f"[run_whisper] ⚠️ 无法清理临时提取音轨: {e}")
+
+        if temp_clean_wav and temp_clean_wav.exists():
+            try:
+                temp_clean_wav.unlink()
+                print("[run_whisper] 🗑️ 已清理前处理临时净化降噪音轨。")
+            except Exception as e:
+                print(f"[run_whisper] ⚠️ 无法清理临时降噪音轨: {e}")
 
     if not result.segments:
         print("[run_whisper] ⚠️ 未探测到有效声轨数据。")
@@ -495,7 +572,7 @@ def run_whisper(video_path: Path, config: dict, prompt_text: str = "",
             # 收集每个 segment 最终的词级精确对齐数据，用于 words.json 写入
             seg_words = []
             for w in getattr(segment, "words", []):
-                # 剔除视觉换行符 \n，还原词级数据纯净度
+                # 剔除视觉换行符 \n，还原词级 data 纯净度
                 clean_word = w.word.replace('\n', '').strip()
                 seg_words.append({
                     "word": clean_word,
