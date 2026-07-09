@@ -18,7 +18,7 @@ def get_video_info(video_path, ffprobe_path="ffprobe"):
         ffprobe_path,
         "-v", "error",
         "-select_streams", "v:0",
-        "-show_entries", "stream=height:format=duration",
+        "-show_entries", "stream=height:format=duration,bit_rate",
         "-of", "json",
         str(video_path)
     ]
@@ -27,10 +27,18 @@ def get_video_info(video_path, ffprobe_path="ffprobe"):
         data = json.loads(res.stdout)
         height = int(data["streams"][0]["height"])
         duration = float(data["format"]["duration"])
-        return height, duration
+        
+        # 优先从 format 中获取整体平均码率
+        bit_rate = data.get("format", {}).get("bit_rate")
+        # 如果没有，尝试从 stream 的 bit_rate 补充
+        if not bit_rate and "streams" in data and len(data["streams"]) > 0:
+            bit_rate = data["streams"][0].get("bit_rate")
+            
+        bit_rate_int = int(bit_rate) if bit_rate else 0
+        return height, duration, bit_rate_int
     except Exception as e:
-        print(f"⚠️ 无法获取视频信息: {e}，使用默认 1080p")
-        return 1080, 0
+        print(f"⚠️ 无法获取视频信息: {e}，使用默认 1080p 且码率设为 0")
+        return 1080, 0, 0
 
 
 def parse_color(color_str):
@@ -233,7 +241,8 @@ def time_str_to_seconds(time_str):
 
 def burn_video_with_progress(video_in, ass_in, logo_in, video_out, total_duration,
                              ffmpeg_path, preview_mode=False, preview_duration=30,
-                             progress_callback=None, intro_path=None, video_height=1080):
+                             progress_callback=None, intro_path=None, video_height=1080,
+                             maxrate_bps=None, bufsize_bps=None):
     print("\n🚀 开始压制与合并处理...")
     ass_path_clean = str(Path(ass_in).as_posix()).replace(":", "\:")
 
@@ -274,7 +283,17 @@ def burn_video_with_progress(video_in, ass_in, logo_in, video_out, total_duratio
         ])
 
     cmd.extend([
-        "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+        "-c:v", "libx264", "-preset", "medium", "-crf", "20"
+    ])
+    
+    # 动态限制最大输出比特率，避免体积无节制虚增
+    if maxrate_bps and maxrate_bps > 0:
+        cmd.extend([
+            "-maxrate", str(maxrate_bps),
+            "-bufsize", str(bufsize_bps)
+        ])
+
+    cmd.extend([
         "-profile:v", "high", "-level", "4.1", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
         video_out
@@ -347,8 +366,19 @@ def burn_subtitles(video_path, en_srt_path, zh_srt_path, output_dir=None,
     ffprobe_path = ffmpeg_cfg.get("ffprobe", "ffprobe")
     logo_path = config.get("logo_path", "") if config else ""
 
-    height, duration = get_video_info(str(video_path), ffprobe_path)
-    print(f"📹 视频: {video_path.name} ({height}p, {int(duration)}秒)")
+    # 解析视频的基础信息，包括原视频的真实码率
+    height, duration, original_bitrate = get_video_info(str(video_path), ffprobe_path)
+    print(f"📹 视频: {video_path.name} ({height}p, {int(duration)}秒, 原平均码率: {original_bitrate // 1000 if original_bitrate else '未知'} kbps)")
+
+    # 动态换算 Cap-CRF 的上限码率及缓冲区 (1.3倍安全系数)
+    maxrate_bps = None
+    bufsize_bps = None
+    if original_bitrate and original_bitrate > 0:
+        maxrate_bps = int(original_bitrate * 1.3)
+        bufsize_bps = int(maxrate_bps * 1.5)
+        print(f"⚙️ 启用动态码率天花板限制 (Cap-CRF): 最大码率={maxrate_bps // 1000} kbps, 缓冲区={bufsize_bps // 1000} kbps")
+    else:
+        print("⚠️ 无法获取原视频有效比特率，跳过 Maxrate 上限设定。")
 
     # 校验并读取片头配置
     intro_cfg = config.get("intro", {}) if config else {}
@@ -362,7 +392,7 @@ def burn_subtitles(video_path, en_srt_path, zh_srt_path, output_dir=None,
         if p.exists() and p.is_file():
             valid_intro_path = str(p)
             try:
-                _, intro_duration = get_video_info(valid_intro_path, ffprobe_path)
+                _, intro_duration, _ = get_video_info(valid_intro_path, ffprobe_path) # 改为解构 3 个返回值防止拆包错误
                 print(f"[burn] 检测到有效片头，将在开头合并: {p.name} ({int(intro_duration)}秒)")
             except Exception as e:
                 print(f"[burn] ⚠️ 读取片头视频信息失败: {e}")
@@ -376,11 +406,12 @@ def burn_subtitles(video_path, en_srt_path, zh_srt_path, output_dir=None,
     safe_base_name = config.get("safe_base_name", video_path.stem)
     out_video = output_dir / f"{safe_base_name}_subtitled.mp4"
 
-    # 将合并后的总时长和片头路径传入压制线程
+    # 将限制码率参数传入压制流程
     success = burn_video_with_progress(
         str(video_path), str(ass_path), logo_path, str(out_video),
         duration + intro_duration, ffmpeg_path, False, 30, progress_callback,
-        intro_path=valid_intro_path, video_height=height
+        intro_path=valid_intro_path, video_height=height,
+        maxrate_bps=maxrate_bps, bufsize_bps=bufsize_bps
     )
 
     if ass_path.exists():
