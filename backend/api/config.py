@@ -79,6 +79,10 @@ class OnlineApiConfig(BaseModel):
     enable_thinking: Optional[bool] = None
     time_window: float = 25.0
     fallbacks: Optional[List[ApiFallbackItem]] = None
+    # 🆕 新增：动态批次与 Token 控制配置
+    max_payload_tokens: int = 400
+    max_lines: int = 20
+    max_input_tokens: int = 1200
 
 class SubtitleReconstructionConfig(BaseModel):
     punctuation_model_dir: str = ""  # BERT 标点恢复模型本地路径

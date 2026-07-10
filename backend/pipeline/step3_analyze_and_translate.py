@@ -9,31 +9,32 @@ from backend.pipeline.translate_online import batch_translate_online, call_api_w
 ANALYSIS_CHUNK_SIZE = 80
 
 # =============================================================================
-# 高质量母本：以 F1 示例作为结构参考，LLM 将基于采样内容改写此模板
+# 🆕 强化加固版母本：引入“双射”、“首尾强拦截”、“绝对禁废话”与“非Markdown”格式锁
 # =============================================================================
-MASTER_TEMPLATE = """You are a professional subtitle translator for F1 racing commentary videos.
+MASTER_TEMPLATE = """You are a professional subtitle translator.
 Task: Translate English subtitle text to Simplified Chinese, LINE BY LINE, with STRICT sequence preservation.
 
 Video Context: 本视频回顾了F1历史上的经典战役与车手传奇。
 
-🚨 CRITICAL RULES - VIOLATION WILL CAUSE ERRORS:
-1. **LINE COUNT MUST MATCH**: Input has N lines, output MUST have exactly N lines. NO merging, NO splitting, NO skipping lines.
-2. **SEQUENCE LOCK**: Line [1] input → Line [1] output. Line [2] input → Line [2] output. NEVER reorder or skip numbers.
-3. **FORMAT LOCK**: Each output line MUST start with [序号] followed by Chinese text. NO exceptions.
+🚨 CRITICAL RULES - VIOLATION WILL CAUSE SYSTEM FAILURE:
+1. **LINE COUNT MUST MATCH EXACTLY**: If input has N lines, your output MUST have exactly N lines. DO NOT merge, split, omit, or skip any lines. This is a strict 1:1 mathematical bijection.
+2. **SEQUENCE LOCK**: Line [1] input -> Line [1] output. Line [2] input -> Line [2] output. Never shuffle or reorder numbers.
+3. **FORMAT LOCK**: Each output line MUST start with '[序号]' followed directly by the Chinese translation. Example: '[1] 第一行翻译内容'.
+4. **ZERO CONVERSATIONAL FILLER & NO MARKDOWN**: The very first character of your response MUST be '[' and the final character must be the end of the last translation. DO NOT write introductions (e.g., 'Sure, here is your...'), explanations, notes, code blocks, or markdown wrappers (do not use backticks like ```).
+5. **SEMANTIC COHERENCE**: If an English sentence is split across multiple lines, translate them in a way that remains coherent but strictly preserves the line-by-line structure.
 
 Input Format Example:
-[1] First line of English text.
-[2] Second line, maybe about Schumacher.
+[1] Jim Clark is a legend.
+[2] The Tufosi love Ferrari.
 
 CORRECT Output Format:
-[1] 第一行中文翻译。
-[2] 第二行中文，也许是关于舒马赫的内容。
+[1] 吉姆·克拉克是个传奇。
+[2] 铁佛寺们热爱法拉利。
 
-❌ FORBIDDEN (Will cause错位):
-- Merging: [1] 翻译内容1 翻译内容2
-- Skipping: Missing [2] directly to [3]
-- Reordering: [2] content before [1]
-- Adding headers/footers/explanations
+❌ STRICTLY FORBIDDEN (Will crash the parser):
+- Merging lines: [1] 吉姆·克拉克是个传奇。 铁佛寺们热爱法拉利。
+- Code blocks or markdown formatting: ```text [1] ... ```
+- Friendly prefaces/notes: "Here is your translation:" or "Note: Tufosi refers to..."
 
 Translation Guidelines:
 1. **ASR Correction & Professional Terms**: Fix speech recognition errors using F1 context:
@@ -53,8 +54,8 @@ Output:
 FINAL CHECK before output:
 - [ ] Line count matches input exactly?
 - [ ] Every [序号] present and in correct order?
-- [ ] No extra text added?
-If any check fails, regenerate until all pass."""
+- [ ] Absolutely no introductions, footnotes, code block symbols, or explanation wrappers?
+If any check fails, reconstruct until all rules are fully followed."""
 
 
 def parse_subtitle_entries(txt_path: Path):
@@ -129,7 +130,7 @@ def _build_sample_text(entries: list) -> str:
 
 
 def _fallback_system_prompt(video_prompt: dict) -> str:
-    """当 LLM 改写失败时的兜底提示词（基于 Step1 信息简单拼接）"""
+    """当 LLM 改写失败时的加固兜底提示词"""
     terms = video_prompt.get("terms", [])
     style = video_prompt.get("style", "专业、准确")
     domain = video_prompt.get("domain", "general")
@@ -145,24 +146,23 @@ def _fallback_system_prompt(video_prompt: dict) -> str:
     return (
         "You are a professional subtitle translator.\n"
         "Task: Translate English subtitle text to Simplified Chinese, LINE BY LINE, with STRICT sequence preservation.\n\n"
-        "🚨 CRITICAL RULES - VIOLATION WILL CAUSE ERRORS:\n"
-        "1. **LINE COUNT MUST MATCH**: Input has N lines, output MUST have exactly N lines. NO merging, NO splitting, NO skipping lines.\n"
-        "2. **SEQUENCE LOCK**: Line [1] input → Line [1] output. NEVER reorder or skip numbers.\n"
-        "3. **FORMAT LOCK**: Each output line MUST start with [序号] followed by Chinese text. NO exceptions.\n\n"
+        "🚨 CRITICAL RULES - VIOLATION WILL CAUSE SYSTEM FAILURE:\n"
+        "1. **LINE COUNT MUST MATCH EXACTLY**: If input has N lines, your output MUST have exactly N lines. DO NOT merge, split, or skip any lines.\n"
+        "2. **SEQUENCE LOCK**: Line [1] input -> Line [1] output. Never shuffle or reorder numbers.\n"
+        "3. **FORMAT LOCK**: Each output line MUST start with '[序号]' followed directly by the Chinese translation. No exceptions.\n"
+        "4. **ZERO CONVERSATIONAL FILLER**: The very first character of your response MUST be '[' and the final character must be the end of the last translation. DO NOT write introductions, explanations, notes, code blocks, or markdown wrappers.\n\n"
         "Translation Guidelines:\n" + "\n".join(guidelines) + "\n\n"
         "FINAL CHECK before output:\n"
         "- [ ] Line count matches input exactly?\n"
         "- [ ] Every [序号] present and in correct order?\n"
-        "- [ ] No extra text added?\n"
-        "If any check fails, regenerate until all pass."
+        "- [ ] No extra text added?"
     )
 
 def generate_tailored_system_prompt(sampled_text: str, config: dict) -> str:
     """
-    Gemini 建议的"母本 + LLM 改写"方案。
-    基于采样字幕和 F1 母本，让 LLM 直接输出完整 System Prompt。
+    基于采样字幕和 reinforced 母本，让 LLM 直接输出加固后的 System Prompt。
     """
-    prompt = f"""你是一位顶级提示词工程师。请根据以下视频字幕采样，改写"翻译母本"，生成一个精准适配该视频的翻译 System Prompt。
+    prompt = f"""你是一位顶级提示词工程师。请根据以下视频字幕采样，改写\"翻译母本\"，生成一个精准适配该视频的翻译 System Prompt。
 
 【翻译母本】（这是结构参考，你必须保留其格式锁和整体结构，但将其中所有 F1 相关内容替换为当前视频的实际内容）
 {MASTER_TEMPLATE}
@@ -171,12 +171,12 @@ def generate_tailored_system_prompt(sampled_text: str, config: dict) -> str:
 {sampled_text}
 
 【要求】
-1. 必须保留母本中的"🚨 CRITICAL RULES"、"❌ FORBIDDEN"和"FINAL CHECK"部分，结构和措辞不得改动。
+1. 必须保留母本中的\"🚨 CRITICAL RULES\"、\"❌ STRICTLY FORBIDDEN\"和\"FINAL CHECK\"部分，其严格对齐、首尾拦截、禁止对话垫片、禁止Markdown代码块的结构和措辞不得改动。
 2. 将母本中的 F1 领域内容全部替换为当前视频的实际领域和主题。
-3. "Video Context"用一句话精准概括视频核心主题（中文）。
-4. "Translation Guidelines"中必须列出具体的 ASR 纠错映射和专业术语翻译（只列采样中实际出现的词或该领域最核心的术语，不要编造）。
-5. "Style"必须精准描述当前视频的叙述语气（如激情解说/轻松访谈/严肃纪录片/幽默吐槽/技术分析等）。
-6. "Example"必须包含一个具体的 Few-shot 示例，示例中要使用 Guidelines 里列出的至少一个术语或 ASR 纠错映射。
+3. \"Video Context\"用一句话精准概括视频核心主题（中文）。
+4. \"Translation Guidelines\"中必须列出具体的 ASR 纠错映射和专业术语翻译（只列采样中实际出现的词或该领域最核心的术语，不要编造）。
+5. \"Style\"必须精准描述当前视频的叙述语气。
+6. \"Example\"必须包含一个具体的 Few-shot 示例，示例中要使用 Guidelines 里列出的至少一个术语或 ASR 纠错映射。
 7. 直接输出改写后的完整 System Prompt，不要添加任何解释，不要加 markdown 代码块标记。
 
 改写后的 System Prompt：
@@ -201,7 +201,7 @@ def generate_tailored_system_prompt(sampled_text: str, config: dict) -> str:
 
 def hierarchical_analyze(entries, config, progress_callback=None, progress_dict=None):
     """
-    分层分析：摘要、标题、广告检测。仅用于生成 meta.json，不再参与翻译提示词。
+    分层分析：摘要、标题、广告检测。
     """
     features = config.get("features", {})
     ENABLE_AD = features.get("enable_ad_detection", True)
@@ -302,8 +302,7 @@ def hierarchical_analyze(entries, config, progress_callback=None, progress_dict=
 
 def batch_translate(entries, video_prompt: dict, config, progress_callback=None, progress_dict=None):
     """
-    批量翻译入口：现在强制使用在线 API。
-    System Prompt 必须已经通过 generate_tailored_system_prompt 写入 config。
+    批量翻译入口
     """
     backend = config.get("translate_backend", "online_api")
     if backend != "online_api":
@@ -320,7 +319,6 @@ def batch_translate(entries, video_prompt: dict, config, progress_callback=None,
             config["translation_system_prompt"] = system_prompt
         
         print(f"[batch_translate] 使用 tailored System Prompt，长度: {len(system_prompt)} 字符")
-        print(f"[batch_translate] 预览（前500字）:\n{system_prompt[:500]}")
         return batch_translate_online(entries, config, progress_callback, progress_dict)
     elif backend == "local_transformers":
         return batch_translate_local(entries, config, progress_callback, progress_dict)
@@ -363,7 +361,7 @@ def run_analysis_and_translate(en_txt_path: Path, config: dict, output_dir: Path
     sampled_text = _build_sample_text(entries)
     print(f"[run_analysis_and_translate] 采样 {len(sampled_text)} 字符用于提示词定制")
     
-    tailored_prompt = generate_tailored_system_prompt(sampled_text,config)
+    tailored_prompt = generate_tailored_system_prompt(sampled_text, config)
     config["translation_system_prompt"] = tailored_prompt
 
     if progress_callback:
@@ -386,8 +384,6 @@ def run_analysis_and_translate(en_txt_path: Path, config: dict, output_dir: Path
 
     zh_entries = batch_translate(entries, {}, config, translate_wrapper, None)
     print(f"   翻译耗时 {time.time() - start_trans:.0f} 秒")
-
-    print("📝 保留单行原文，不进行 Step3 预分割")
 
     zh_srt_path = output_dir / f"{safe_base_name}_zh.srt"
     zh_txt_path = output_dir / f"{safe_base_name}_zh.txt"
