@@ -13,6 +13,7 @@
 1. **上下文感知的语音识别**
    - 上传视频后，先从文件名推测领域（足球、篮球、F1 等），生成一份“ASR 提示词”（比如 `Bellingham → 贝林厄姆`、`Serie A → 意甲`），注入 Whisper 的 `initial_prompt`。
    - 这样 Whisper 在识别时会更倾向于把模糊发音识别成正确的专有名词，而不是常见的近似词。
+   - 基于词级时间戳进行语义切分（标点>停顿>连词优先级），替代Whisper原生分段，断句效果大幅优于原生模型
 
 2. **基于内容的翻译，而不是简单的逐句机翻**
    - 语音识别完成后，系统会采样部分字幕，调用大模型分析出真实的领域术语、话语风格，甚至常见的 ASR 错误（比如 `Serie R → 意甲`），把这些信息揉进翻译的 system prompt。
@@ -126,8 +127,8 @@ python run.py
 ---
 
 ## 界面预览
-![任务中心](example_pics/579a122eb8e23b3618dbc47bf185da64.png)
-![历史记录](example_pics/b1301400cfe27a7bc7547768435988f0.png)
+![任务中心](example_pics/landpage.png)
+![历史记录](example_pics/history.png)
 ---
 
 ## License
