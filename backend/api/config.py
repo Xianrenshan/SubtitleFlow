@@ -12,8 +12,9 @@ class FeaturesConfig(BaseModel):
     enable_titles: bool = False
     enable_tags: bool = False
     enable_denoise: bool = False
-    enable_asr_correction_agent: bool = True       # 🆕 ASR 文本纠错 Agent 开关
-    enable_asr_resegmentation_agent: bool = True   # 🆕 ASR 英文断句重排 Agent 开关
+    enable_asr_correction_agent: bool = True       # 🆕 ASR 文本错别字校对 Agent
+    enable_asr_resegmentation_agent: bool = True   # 🆕 ASR 英文断句调整 Agent
+    enable_zh_layout_agent: bool = True            # 🆕 中文字幕排版与净化 Agent
 
 class OllamaModelConfig(BaseModel):
     model: str
@@ -81,18 +82,17 @@ class OnlineApiConfig(BaseModel):
     enable_thinking: Optional[bool] = None
     time_window: float = 25.0
     fallbacks: Optional[List[ApiFallbackItem]] = None
-    # 🆕 新增：动态批次与 Token 控制配置
     max_payload_tokens: int = 400
     max_lines: int = 20
     max_input_tokens: int = 1200
 
 class SubtitleReconstructionConfig(BaseModel):
-    punctuation_model_dir: str = ""  # BERT 标点恢复模型本地路径
-    spacy_model_name: str = "en_core_web_trf" # spaCy Transformer 模型名称
-    max_chars_per_line: int = 42  # 单行最大英文字符数
-    max_duration_sec: float = 7.0  # 单条字幕最大持续时间
-    merge_gap_threshold: float = 0.5  # 短句合并的最大时间间隔(秒)
-    micro_gap_ms: int = 100  # 拆分长句时注入的微缝隙(毫秒)
+    punctuation_model_dir: str = ""
+    spacy_model_name: str = "en_core_web_trf"
+    max_chars_per_line: int = 42
+    max_duration_sec: float = 7.0
+    merge_gap_threshold: float = 0.5
+    micro_gap_ms: int = 100
 
 class IntroConfig(BaseModel):
     enable: bool = False

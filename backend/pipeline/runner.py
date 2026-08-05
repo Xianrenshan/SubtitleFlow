@@ -36,6 +36,7 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     en_txt_path = output_dir / f"{safe_base_name}.txt"
     words_json_path = output_dir / f"{safe_base_name}_words.json"
     zh_srt_path = output_dir / f"{safe_base_name}_zh.srt"
+    zh_txt_path = output_dir / f"{safe_base_name}_zh.txt"
     meta_path = output_dir / f"{safe_base_name}_meta.json"
 
     # 中间文件存在性检测
@@ -119,7 +120,6 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     enable_resegmentation = features.get("enable_asr_resegmentation_agent", True)
 
     if (enable_correction or enable_resegmentation) and words_json_path and words_json_path.exists():
-        # 🆕 统一保持使用步骤名 "语音识别"，确保数据库 update_task 过滤条件成立且前端正常显示
         await set_step_started("语音识别")
         await progress_callback("语音识别", 95, 0, None, force=True)
 
@@ -148,12 +148,6 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
             if agent_logs:
                 from backend.pipeline.subtitle_reconstruction import sync_words_to_subtitles
                 await asyncio.to_thread(sync_words_to_subtitles, word_data, output_dir, safe_base_name)
-
-                # 落盘 Agent 操作审计日志 (方便测试阶段精准查看修改记录)
-                audit_log_path = output_dir / f"{safe_base_name}_agent_log.json"
-                with open(audit_log_path, "w", encoding="utf-8") as f:
-                    json.dump(agent_logs, f, ensure_ascii=False, indent=2)
-                print(f"📄 [Runner] Agent 测试操作日志已保存至: {audit_log_path.name} (共 {len(agent_logs)} 条变更记录)")
 
         except Exception as e:
             import traceback
@@ -188,6 +182,33 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
         finally:
             await safe_cancel(heartbeat_task3)
         await progress_callback("分析与翻译", 100, 0, None, force=True)
+
+    # ========== Step 3.5: 中文字幕排版与净化 Agent 后置处理 ==========
+    enable_zh_layout = features.get("enable_zh_layout_agent", True)
+    if enable_zh_layout and zh_srt_path and zh_srt_path.exists():
+        await set_step_started("分析与翻译")
+        await progress_callback("分析与翻译", 95, 0, None, force=True)
+
+        try:
+            from backend.pipeline.agent_zh_layout import run_zh_layout_agent
+            zh_logs = await asyncio.to_thread(
+                run_zh_layout_agent, zh_srt_path, zh_txt_path, config, output_dir, safe_base_name
+            )
+            if zh_logs:
+                agent_logs.extend(zh_logs)
+        except Exception as e:
+            import traceback
+            print(f"⚠️ [Runner] 中文字幕排版 Agent 处理触发异常，已自动平滑降级跳过: {e}")
+            traceback.print_exc()
+
+        await progress_callback("分析与翻译", 100, 0, None, force=True)
+
+    # 统一落盘 Agent 测试操作审计日志 (方便查看所有 Agent 的变更记录)
+    if agent_logs:
+        audit_log_path = output_dir / f"{safe_base_name}_agent_log.json"
+        with open(audit_log_path, "w", encoding="utf-8") as f:
+            json.dump(agent_logs, f, ensure_ascii=False, indent=2)
+        print(f"📄 [Runner] Agent 测试操作日志已更新保存至: {audit_log_path.name} (共 {len(agent_logs)} 条变更记录)")
 
     # ========== Step 4: 压制字幕 ==========
     old_ass = output_dir / "temp_bilingual.ass"

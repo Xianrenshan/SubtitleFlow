@@ -5,8 +5,9 @@
     <div class="config-row"> <span>广告检测</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">自动识别并标记广告片段</span> <el-switch v-model="configForm.features.enable_ad_detection" /> </div> </div>
     <div class="config-row"> <span>内容摘要</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">自动生成视频内容中文摘要</span> <el-switch v-model="configForm.features.enable_summary" /> </div> </div>
     <div class="config-row"> <span>推荐标题</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">自动生成 5 个吸引人的中文标题</span> <el-switch v-model="configForm.features.enable_titles" /> </div> </div>
-    <div class="config-row"><span>ASR 文本智能纠错 Agent</span><div style="display: flex; align-items: center; gap: 10px;"><span class="desc">利用 PydanticAI 扫描并修正 Whisper 同音错词与专业术语</span><el-switch v-model="configForm.features.enable_asr_correction_agent" /></div></div>
-  <div class="config-row"><span>ASR 英文断句重排 Agent</span><div style="display: flex; align-items: center; gap: 10px;"><span class="desc">利用 PydanticAI 平移切割点，解决跨句粘连与误切问题</span><el-switch v-model="configForm.features.enable_asr_resegmentation_agent" /></div></div>
+    <div class="config-row"> <span>ASR 文本智能纠错 Agent</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">利用 PydanticAI 扫描并修正 Whisper 同音错词与专业术语</span> <el-switch v-model="configForm.features.enable_asr_correction_agent" /> </div> </div>
+    <div class="config-row"> <span>ASR 英文断句重排 Agent</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">利用 PydanticAI 平移切割点，解决跨句粘连与误切问题</span> <el-switch v-model="configForm.features.enable_asr_resegmentation_agent" /> </div> </div>
+    <div class="config-row"> <span>中文字幕排版与净化 Agent</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">利用 PydanticAI 重排 15字+3字 畸形排版，并自动消除“此处置空”等 AI 废话</span> <el-switch v-model="configForm.features.enable_zh_layout_agent" /> </div> </div>
   </div>
   <div class="config-card">
     <h3>模型设置</h3>
@@ -19,7 +20,6 @@
     <h3>翻译后端</h3>
     <div class="config-row"> <span>翻译方式</span> <el-select v-model="configForm.translate_backend" style="width: 200px;"> <el-option label="Ollama (本地模型)" value="ollama" /> <el-option label="本地 Transformers (HY-MT1.5)" value="local_transformers" /> <el-option label="在线 API (OpenAI 兼容)" value="online_api" /> </el-select> </div>
     <template v-if="configForm.translate_backend === 'online_api'">
-      <!-- 新增：厂商选择下拉菜单 -->
       <div class="config-row">
         <span>API 厂商</span>
         <el-select v-model="configForm.online_api.provider" placeholder="选择厂商" @change="onProviderChange" style="width: 200px;">
@@ -44,7 +44,6 @@
           <div class="fallback-header"> <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">备用 API {{ idx + 1 }}</span> <el-button type="danger" plain size="small" @click="removeFallback(idx)">移除</el-button> </div>
           <div style="display: flex; flex-direction: column; gap: 10px;">
             <div class="config-row"><span>名称</span><el-input v-model="fb.name" placeholder="备用1" style="width: 200px;" /></div>
-            <!-- 新增：备用 API 厂商选择 -->
             <div class="config-row">
               <span>API 厂商</span>
               <el-select v-model="fb.provider" placeholder="选择厂商" @change="(val) => onFallbackProviderChange(val, idx)" style="width: 200px;">
