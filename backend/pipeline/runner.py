@@ -28,6 +28,9 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     features = config.get("features", {})
     loop = asyncio.get_running_loop()
 
+    # 🆕 提前在作用域顶层初始化，防止 skip_step1_2 为 True 时引发 UnboundLocalError
+    initial_prompt = ""
+
     # 预计算所有中间文件路径
     en_srt_path = output_dir / f"{safe_base_name}.srt"
     en_txt_path = output_dir / f"{safe_base_name}.txt"
@@ -74,7 +77,6 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
             words_json_path = None
     else:
         # Step 1
-        initial_prompt = ""
         if features.get("enable_asr_prompt", True):
             await set_step_started("生成ASR提示词")
             await progress_callback("生成ASR提示词", 0, 0, None, force=True)
@@ -109,6 +111,55 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
                 words_json_path.touch()
         finally:
             await safe_cancel(heartbeat_task2)
+        await progress_callback("语音识别", 100, 0, None, force=True)
+
+    # ========== Step 2.5: ASR 智能体优化 (纠错与断句重排) ==========
+    agent_logs = []
+    enable_correction = features.get("enable_asr_correction_agent", True)
+    enable_resegmentation = features.get("enable_asr_resegmentation_agent", True)
+
+    if (enable_correction or enable_resegmentation) and words_json_path and words_json_path.exists():
+        # 🆕 统一保持使用步骤名 "语音识别"，确保数据库 update_task 过滤条件成立且前端正常显示
+        await set_step_started("语音识别")
+        await progress_callback("语音识别", 95, 0, None, force=True)
+
+        try:
+            with open(words_json_path, "r", encoding="utf-8") as f:
+                word_data = json.load(f)
+
+            # 1. 运行 ASR 错别字校对 Agent
+            if enable_correction:
+                from backend.pipeline.agent_asr_correction import run_asr_correction_agent
+                config["initial_prompt_str"] = initial_prompt
+                word_data, corr_logs = await asyncio.to_thread(
+                    run_asr_correction_agent, word_data, config, output_dir, safe_base_name
+                )
+                agent_logs.extend(corr_logs)
+
+            # 2. 运行 ASR 英文断句调整 Agent
+            if enable_resegmentation:
+                from backend.pipeline.agent_asr_resegmentation import run_asr_resegmentation_agent
+                word_data, reseg_logs = await asyncio.to_thread(
+                    run_asr_resegmentation_agent, word_data, config, output_dir, safe_base_name
+                )
+                agent_logs.extend(reseg_logs)
+
+            # 3. 刷写更新后的数据到磁盘 SRT/TXT
+            if agent_logs:
+                from backend.pipeline.subtitle_reconstruction import sync_words_to_subtitles
+                await asyncio.to_thread(sync_words_to_subtitles, word_data, output_dir, safe_base_name)
+
+                # 落盘 Agent 操作审计日志 (方便测试阶段精准查看修改记录)
+                audit_log_path = output_dir / f"{safe_base_name}_agent_log.json"
+                with open(audit_log_path, "w", encoding="utf-8") as f:
+                    json.dump(agent_logs, f, ensure_ascii=False, indent=2)
+                print(f"📄 [Runner] Agent 测试操作日志已保存至: {audit_log_path.name} (共 {len(agent_logs)} 条变更记录)")
+
+        except Exception as e:
+            import traceback
+            print(f"⚠️ [Runner] ASR Agent 优化阶段触发异常，已自动平滑降级跳过: {e}")
+            traceback.print_exc()
+
         await progress_callback("语音识别", 100, 0, None, force=True)
 
     # ========== Step 3: 分析与翻译 ==========

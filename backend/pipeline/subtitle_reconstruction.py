@@ -182,3 +182,28 @@ def reconstruct_and_save(result: Any, output_dir: Path, safe_base_name: str, con
 
     print(f"🚀 [Incremental Build Engine] 打包完成。共生成 {len(entries)} 条字幕。")
     return srt_path, txt_path, words_json_path
+
+def sync_words_to_subtitles(word_data: List[Dict[str, Any]], output_dir: Path, safe_base_name: str):
+    """
+    根据 Agent 优化更新后的内存 word_data，重新同步生成 .srt, .txt 以及 words.json 文件
+    """
+    srt_path = output_dir / f"{safe_base_name}.srt"
+    txt_path = output_dir / f"{safe_base_name}.txt"
+    words_json_path = output_dir / f"{safe_base_name}_words.json"
+
+    with open(srt_path, "w", encoding="utf-8") as f_srt, \
+         open(txt_path, "w", encoding="utf-8") as f_txt:
+
+        for idx, e in enumerate(word_data, 1):
+            start_str = format_timestamp(e['start'])
+            end_str = format_timestamp(e['end'])
+            text = e['text'].strip()
+
+            e['index'] = idx
+            f_srt.write(f"{idx}\n{start_str} --> {end_str}\n{text}\n\n")
+            f_txt.write(f"{idx}\n{start_str} --> {end_str}\n{text}\n\n")
+
+    with open(words_json_path, "w", encoding="utf-8") as f:
+        json.dump(word_data, f, ensure_ascii=False, indent=2)
+
+    print(f"🔄 [sync_words_to_subtitles] 字幕文件与词级时间戳已成功刷写同步")

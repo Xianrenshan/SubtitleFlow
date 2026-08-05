@@ -5,6 +5,8 @@
     <div class="config-row"> <span>广告检测</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">自动识别并标记广告片段</span> <el-switch v-model="configForm.features.enable_ad_detection" /> </div> </div>
     <div class="config-row"> <span>内容摘要</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">自动生成视频内容中文摘要</span> <el-switch v-model="configForm.features.enable_summary" /> </div> </div>
     <div class="config-row"> <span>推荐标题</span> <div style="display: flex; align-items: center; gap: 10px;"> <span class="desc">自动生成 5 个吸引人的中文标题</span> <el-switch v-model="configForm.features.enable_titles" /> </div> </div>
+    <div class="config-row"><span>ASR 文本智能纠错 Agent</span><div style="display: flex; align-items: center; gap: 10px;"><span class="desc">利用 PydanticAI 扫描并修正 Whisper 同音错词与专业术语</span><el-switch v-model="configForm.features.enable_asr_correction_agent" /></div></div>
+  <div class="config-row"><span>ASR 英文断句重排 Agent</span><div style="display: flex; align-items: center; gap: 10px;"><span class="desc">利用 PydanticAI 平移切割点，解决跨句粘连与误切问题</span><el-switch v-model="configForm.features.enable_asr_resegmentation_agent" /></div></div>
   </div>
   <div class="config-card">
     <h3>模型设置</h3>

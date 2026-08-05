@@ -11,7 +11,9 @@ class FeaturesConfig(BaseModel):
     enable_summary: bool = False
     enable_titles: bool = False
     enable_tags: bool = False
-    enable_denoise: bool = False  # 🆕 新增：声学人声净化前处理开关
+    enable_denoise: bool = False
+    enable_asr_correction_agent: bool = True       # 🆕 ASR 文本纠错 Agent 开关
+    enable_asr_resegmentation_agent: bool = True   # 🆕 ASR 英文断句重排 Agent 开关
 
 class OllamaModelConfig(BaseModel):
     model: str
