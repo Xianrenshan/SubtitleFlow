@@ -23,9 +23,9 @@ def _delete_task_files(task):
 @router.get("/tasks")
 async def list_tasks(
     status: Optional[str] = Query(None),
-    search: Optional[str] = Query(None), # 🆕 新增搜索参数
+    search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=1000) # 🆕 放宽最大限制
+    page_size: int = Query(20, ge=1, le=1000)
 ):
     tasks, total = await get_all_tasks(status=status, page=page, page_size=page_size, search=search)
     return {
@@ -47,6 +47,7 @@ async def list_tasks(
                 "output_meta": t.output_meta,
                 "original_filename": t.original_filename,
                 "file_size": t.file_size,
+                "token_usage": t.token_usage,  # 🆕 返回 Token Usage 给前端历史列表展示
             }
             for t in tasks
         ]

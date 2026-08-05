@@ -105,12 +105,12 @@ def apply_dry_run_resegmentation(
 
     return success_count
 
-
 def run_asr_resegmentation_agent(
     word_data: List[Dict[str, Any]],
     config: dict,
     output_dir: Path,
-    safe_base_name: str
+    safe_base_name: str,
+    token_tracker=None
 ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """ASR 英文断句调整 Agent 主入口"""
     if not word_data:
@@ -132,6 +132,9 @@ def run_asr_resegmentation_agent(
     chunk_size = math.ceil(total_lines / X)
 
     audit_logs = []
+    online_cfg = config.get("online_api", {})
+    model_name = online_cfg.get("model", "gpt-4o-mini")
+    provider = online_cfg.get("provider", "openai")
 
     for i in range(0, total_lines, chunk_size):
         chunk = word_data[i:i + chunk_size]
@@ -149,6 +152,13 @@ def run_asr_resegmentation_agent(
             result = agent.run_sync(json.dumps(prompt_input, ensure_ascii=False))
             patch: ResegmentationPatchSchema = result.data
             apply_dry_run_resegmentation(word_data, patch, audit_logs)
+
+            if token_tracker and hasattr(result, "usage"):
+                usage = result.usage()
+                p_tokens = getattr(usage, "request_tokens", 0) or 0
+                c_tokens = getattr(usage, "response_tokens", 0) or 0
+                t_tokens = getattr(usage, "total_tokens", p_tokens + c_tokens) or 0
+                token_tracker.record_call("asr_resegmentation", p_tokens, c_tokens, t_tokens, model=model_name, provider=provider)
         except Exception as e:
             print(f"[ASR Resegmentation Agent] 批次断句跳过: {e}")
 

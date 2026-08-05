@@ -11,12 +11,16 @@ AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-    # 🆕 迁移：为已有数据库添加 file_size 列
+    # 🆕 迁移：为已有数据库添加 file_size 和 token_usage 列
     try:
         await conn.execute(text("ALTER TABLE tasks ADD COLUMN file_size INTEGER"))
     except Exception:
-        pass # 列已存在，忽略
+        pass
+
+    try:
+        await conn.execute(text("ALTER TABLE tasks ADD COLUMN token_usage JSON"))
+    except Exception:
+        pass
 
 async def get_task(task_id: str) -> TaskDB | None:
     async with AsyncSessionLocal() as session:
@@ -59,7 +63,6 @@ async def get_all_tasks(status: str = None, page: int = 1, page_size: int = 20, 
             if statuses:
                 stmt = stmt.where(TaskDB.status.in_(statuses))
                 
-        # 🆕 新增：文件名模糊搜索
         if search:
             stmt = stmt.where(TaskDB.original_filename.like(f"%{search}%"))
             

@@ -9,10 +9,13 @@ from backend.config import PROJECT_ROOT
 from backend.pipeline import step1_generate_prompt, step2_whisper, step3_analyze_and_translate, step4_burn_subtitles, subtitle_reconstruction
 from backend.database import update_task
 from backend.pipeline.heartbeat import heartbeat_updater
+from typing import Any
 
-async def run_pipeline(video_path: Path, config: dict, progress_callback: Callable[[str, int, float, float], Awaitable[None]]) -> Dict[str, str]:
+async def run_pipeline(video_path: Path, config: dict, progress_callback: Callable[[str, int, float, float], Awaitable[None]]) -> Dict[str, Any]:
+    from backend.utils.token_tracker import TokenTracker
+    token_tracker = TokenTracker()
+
     task_id = video_path.stem
-    
     original_filename = config.get("original_filename", video_path.name)
     safe_stem = Path(original_filename).stem
     safe_stem = re.sub(r'[\\/:*?"<>|]', '_', safe_stem)
@@ -28,10 +31,8 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     features = config.get("features", {})
     loop = asyncio.get_running_loop()
 
-    # 🆕 提前在作用域顶层初始化，防止 skip_step1_2 为 True 时引发 UnboundLocalError
     initial_prompt = ""
 
-    # 预计算所有中间文件路径
     en_srt_path = output_dir / f"{safe_base_name}.srt"
     en_txt_path = output_dir / f"{safe_base_name}.txt"
     words_json_path = output_dir / f"{safe_base_name}_words.json"
@@ -39,7 +40,6 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
     zh_txt_path = output_dir / f"{safe_base_name}_zh.txt"
     meta_path = output_dir / f"{safe_base_name}_meta.json"
 
-    # 中间文件存在性检测
     skip_step1_2 = en_srt_path.exists() and en_srt_path.stat().st_size > 0
     skip_step3 = zh_srt_path.exists() and zh_srt_path.stat().st_size > 0
 
@@ -65,9 +65,8 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
         from datetime import datetime
         await update_task(task_id, current_step=step_name, step_started_at=datetime.utcnow())
 
-    # ========== Step 1 & 2: 生成 ASR 提示词 + 语音识别 ==========
+    # Step 1 & 2
     if skip_step1_2:
-        print(f"[runner] 检测到已有英文字幕，跳过识别步骤")
         await set_step_started("生成ASR提示词")
         await progress_callback("生成ASR提示词", 100, 0, None, force=True)
         await set_step_started("语音识别")
@@ -77,18 +76,14 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
         if not words_json_path.exists():
             words_json_path = None
     else:
-        # Step 1
         if features.get("enable_asr_prompt", True):
             await set_step_started("生成ASR提示词")
             await progress_callback("生成ASR提示词", 0, 0, None, force=True)
             initial_prompt = await asyncio.to_thread(
-                step1_generate_prompt.generate_prompt, video_path, config
+                step1_generate_prompt.generate_prompt, video_path, config, token_tracker
             )
             await progress_callback("生成ASR提示词", 100, 0, None, force=True)
-        else:
-            print("[runner] Step1 已关闭，跳过 ASR 提示词生成")
 
-        # Step 2
         await set_step_started("语音识别")
         await progress_callback("语音识别", 0, 0, None, force=True)
         whisper_progress = {"percent": 0}
@@ -97,11 +92,9 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
             heartbeat_updater("语音识别", progress_callback, lambda: whisper_progress["percent"])
         )
         try:
-            # ✅ 接收纯净的 result 对象
             result = await asyncio.to_thread(
                 step2_whisper.run_whisper, video_path, config, initial_prompt, output_dir, updater2, whisper_progress
             )
-            # ✅ 调用增量构建引擎进行字幕打包
             if result and result.segments:
                 en_srt_path, en_txt_path, words_json_path = await asyncio.to_thread(
                     subtitle_reconstruction.reconstruct_and_save, result, output_dir, safe_base_name, config
@@ -114,7 +107,7 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
             await safe_cancel(heartbeat_task2)
         await progress_callback("语音识别", 100, 0, None, force=True)
 
-    # ========== Step 2.5: ASR 智能体优化 (纠错与断句重排) ==========
+    # Step 2.5: ASR 智能体优化
     agent_logs = []
     enable_correction = features.get("enable_asr_correction_agent", True)
     enable_resegmentation = features.get("enable_asr_resegmentation_agent", True)
@@ -127,38 +120,34 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
             with open(words_json_path, "r", encoding="utf-8") as f:
                 word_data = json.load(f)
 
-            # 1. 运行 ASR 错别字校对 Agent
             if enable_correction:
                 from backend.pipeline.agent_asr_correction import run_asr_correction_agent
                 config["initial_prompt_str"] = initial_prompt
                 word_data, corr_logs = await asyncio.to_thread(
-                    run_asr_correction_agent, word_data, config, output_dir, safe_base_name
+                    run_asr_correction_agent, word_data, config, output_dir, safe_base_name, token_tracker
                 )
                 agent_logs.extend(corr_logs)
 
-            # 2. 运行 ASR 英文断句调整 Agent
             if enable_resegmentation:
                 from backend.pipeline.agent_asr_resegmentation import run_asr_resegmentation_agent
                 word_data, reseg_logs = await asyncio.to_thread(
-                    run_asr_resegmentation_agent, word_data, config, output_dir, safe_base_name
+                    run_asr_resegmentation_agent, word_data, config, output_dir, safe_base_name, token_tracker
                 )
                 agent_logs.extend(reseg_logs)
 
-            # 3. 刷写更新后的数据到磁盘 SRT/TXT
             if agent_logs:
                 from backend.pipeline.subtitle_reconstruction import sync_words_to_subtitles
                 await asyncio.to_thread(sync_words_to_subtitles, word_data, output_dir, safe_base_name)
 
         except Exception as e:
             import traceback
-            print(f"⚠️ [Runner] ASR Agent 优化阶段触发异常，已自动平滑降级跳过: {e}")
+            print(f"⚠️ [Runner] ASR Agent 优化阶段触发异常: {e}")
             traceback.print_exc()
 
         await progress_callback("语音识别", 100, 0, None, force=True)
 
-    # ========== Step 3: 分析与翻译 ==========
+    # Step 3: 分析与翻译
     if skip_step3:
-        print(f"[runner] 检测到已有中文字幕，跳过翻译步骤")
         await set_step_started("分析与翻译")
         await progress_callback("分析与翻译", 100, 0, None, force=True)
         if not meta_path.exists():
@@ -175,7 +164,7 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
         )
         try:
             zh_srt_path_result, zh_txt_path, meta_path_result = await asyncio.to_thread(
-                step3_analyze_and_translate.run_analysis_and_translate, en_txt_path, config, output_dir, updater3, translate_progress, None
+                step3_analyze_and_translate.run_analysis_and_translate, en_txt_path, config, output_dir, updater3, translate_progress, None, token_tracker
             )
             zh_srt_path = zh_srt_path_result
             meta_path = meta_path_result
@@ -183,7 +172,7 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
             await safe_cancel(heartbeat_task3)
         await progress_callback("分析与翻译", 100, 0, None, force=True)
 
-    # ========== Step 3.5: 中文字幕排版与净化 Agent 后置处理 ==========
+    # Step 3.5: 中文字幕排版 Agent
     enable_zh_layout = features.get("enable_zh_layout_agent", True)
     if enable_zh_layout and zh_srt_path and zh_srt_path.exists():
         await set_step_started("分析与翻译")
@@ -192,35 +181,23 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
         try:
             from backend.pipeline.agent_zh_layout import run_zh_layout_agent
             zh_logs = await asyncio.to_thread(
-                run_zh_layout_agent, zh_srt_path, zh_txt_path, config, output_dir, safe_base_name
+                run_zh_layout_agent, zh_srt_path, zh_txt_path, config, output_dir, safe_base_name, token_tracker
             )
             if zh_logs:
                 agent_logs.extend(zh_logs)
         except Exception as e:
             import traceback
-            print(f"⚠️ [Runner] 中文字幕排版 Agent 处理触发异常，已自动平滑降级跳过: {e}")
+            print(f"⚠️ [Runner] 中文字幕排版 Agent 处理触发异常: {e}")
             traceback.print_exc()
 
         await progress_callback("分析与翻译", 100, 0, None, force=True)
 
-    # 统一落盘 Agent 测试操作审计日志 (方便查看所有 Agent 的变更记录)
     if agent_logs:
         audit_log_path = output_dir / f"{safe_base_name}_agent_log.json"
         with open(audit_log_path, "w", encoding="utf-8") as f:
             json.dump(agent_logs, f, ensure_ascii=False, indent=2)
-        print(f"📄 [Runner] Agent 测试操作日志已更新保存至: {audit_log_path.name} (共 {len(agent_logs)} 条变更记录)")
 
-    # ========== Step 4: 压制字幕 ==========
-    old_ass = output_dir / "temp_bilingual.ass"
-    if old_ass.exists():
-        try: old_ass.unlink()
-        except Exception: pass
-
-    old_video = output_dir / f"{safe_base_name}_subtitled.mp4"
-    if old_video.exists():
-        try: old_video.unlink()
-        except Exception: pass
-
+    # Step 4: 压制字幕
     await set_step_started("压制字幕")
     await progress_callback("压制字幕", 0, 0, None, force=True)
     updater4 = make_sync_updater("压制字幕")
@@ -235,4 +212,5 @@ async def run_pipeline(video_path: Path, config: dict, progress_callback: Callab
         "output_zh_srt": str(zh_srt_path),
         "output_en_srt": str(en_srt_path),
         "output_meta": str(meta_path),
+        "token_usage": token_tracker.get_summary()  # 🆕 返回详细的 Token 消耗统计
     }

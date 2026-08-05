@@ -20,6 +20,7 @@ async def task_status(task_id: str):
         step_elapsed_sec=task.step_elapsed_sec,
         eta_sec=task.eta_sec,
         step_started_at=task.step_started_at,
+        token_usage=task.token_usage,  # 🆕 包含 Token 统计数据
     )
     if task.status == TaskStatus.SUCCESS:
         resp.download_urls = {

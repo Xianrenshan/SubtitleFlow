@@ -14,7 +14,6 @@ class TaskStatus(str, Enum):
     SUCCESS = "success"
     FAILED = "failed"
 
-
 class TaskDB(Base):
     __tablename__ = "tasks"
 
@@ -36,8 +35,8 @@ class TaskDB(Base):
     eta_sec = Column(Float, nullable=True)
     step_started_at = Column(DateTime, nullable=True)
     original_filename = Column(String, nullable=True)
-    file_size = Column(Integer, nullable=True)  # 🆕 文件大小（字节）
-
+    file_size = Column(Integer, nullable=True)
+    token_usage = Column(JSON, nullable=True)  # 🆕 Token 消耗及模型使用明细
 
 class TaskResponse(BaseModel):
     task_id: str
@@ -50,6 +49,7 @@ class TaskResponse(BaseModel):
     step_elapsed_sec: float | None = None
     eta_sec: float | None = None
     step_started_at: datetime | None = None
+    token_usage: dict | None = None  # 🆕 增加 Token 消耗与模型明细响应字段
 
     class Config:
         from_attributes = True

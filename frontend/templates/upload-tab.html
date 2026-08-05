@@ -78,6 +78,22 @@
         <h2 style="margin: 10px 0; color: var(--success);">处理成功！</h2>
         <p style="color: var(--text-secondary);">你的视频已处理完毕，请下载文件</p>
       </div>
+
+      <!-- 处理中心完成页：包含简化的 Token 消耗与模型明细 -->
+      <div v-if="task.token_usage && task.token_usage.total_tokens > 0" class="token-summary-card">
+        <div class="token-summary-header">
+          <span style="font-weight: 600; font-size: 14px;">⚡ 消耗统计：共 {{ task.token_usage.total_tokens.toLocaleString() }} Tokens（调用 {{ task.token_usage.total_calls }} 次 API）</span>
+        </div>
+        <div class="token-summary-body">
+          <div v-for="(p, key) in task.token_usage.phases" :key="key" class="token-summary-item">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+              <span style="font-weight: 500;">{{ p.phase_name }} <small style="color:var(--text-tertiary);">({{ p.model || '-' }})</small></span>
+              <span style="font-family: var(--font-mono);">{{ p.total_tokens.toLocaleString() }} Tokens</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="download-grid">
         <a :href="'/api/download/' + task.task_id + '/video'" class="download-item" v-if="task.download_urls && task.download_urls.video"> <span style="font-size: 28px;">🎬</span><span>压制视频</span> </a>
         <a :href="'/api/download/' + task.task_id + '/zh_srt'" class="download-item" v-if="task.download_urls && task.download_urls.zh_srt"> <span style="font-size: 28px;">🇨🇳</span><span>中文字幕</span> </a>

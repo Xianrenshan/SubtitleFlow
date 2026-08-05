@@ -102,7 +102,8 @@ def run_zh_layout_agent(
     zh_txt_path: Path,
     config: dict,
     output_dir: Path,
-    safe_base_name: str
+    safe_base_name: str,
+    token_tracker=None
 ) -> List[Dict[str, Any]]:
     """中文字幕排版与净化 Agent 主入口"""
     zh_entries = parse_zh_srt_entries(zh_srt_path)
@@ -127,6 +128,9 @@ def run_zh_layout_agent(
     chunk_size = math.ceil(total_lines / X)
 
     audit_logs = []
+    online_cfg = config.get("online_api", {})
+    model_name = online_cfg.get("model", "gpt-4o-mini")
+    provider = online_cfg.get("provider", "openai")
 
     for i in range(0, total_lines, chunk_size):
         chunk = zh_entries[i:i + chunk_size]
@@ -142,6 +146,13 @@ def run_zh_layout_agent(
             result = agent.run_sync(json.dumps(prompt_input, ensure_ascii=False))
             patch: ZhLayoutPatchSchema = result.data
             apply_dry_run_zh_layout(zh_entries, patch, audit_logs)
+
+            if token_tracker and hasattr(result, "usage"):
+                usage = result.usage()
+                p_tokens = getattr(usage, "request_tokens", 0) or 0
+                c_tokens = getattr(usage, "response_tokens", 0) or 0
+                t_tokens = getattr(usage, "total_tokens", p_tokens + c_tokens) or 0
+                token_tracker.record_call("zh_layout", p_tokens, c_tokens, t_tokens, model=model_name, provider=provider)
         except Exception as e:
             print(f"[ZH Layout Agent] 批次排版处理跳过: {e}")
 
