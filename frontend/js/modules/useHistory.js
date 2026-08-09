@@ -1,20 +1,23 @@
 /**
  * useHistory.js - 历史记录查询与重试管理 Composable
+ *
+ * 变更：reprocessTask 改为调用入队 API（POST /tasks/{id}/reprocess）
+ * 而非直接启动流水线。入队后刷新任务队列。
  */
 const { ref, reactive, computed } = window.Vue;
 
-export function useHistory(task, steps, startPolling, resetMain, activeTab) {
+export function useHistory(task, steps, startPolling, resetMain, activeTab, fetchTaskQueue) {
     const historyTasks = ref([]);
     const historyFilter = reactive({ status: '', search: '' });
     let debounceTimer = null;
 
-    const onSearchInput = () => { 
-        if (debounceTimer) clearTimeout(debounceTimer); 
-        debounceTimer = setTimeout(() => { fetchHistory(); }, 500); 
+    const onSearchInput = () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { fetchHistory(); }, 500);
     };
 
-    const filteredHistoryTasks = computed(() => { 
-        return historyTasks.value; 
+    const filteredHistoryTasks = computed(() => {
+        return historyTasks.value;
     });
 
     const fetchHistory = async () => {
@@ -22,86 +25,96 @@ export function useHistory(task, steps, startPolling, resetMain, activeTab) {
             const params = new URLSearchParams();
             if (historyFilter.status) params.append('status', historyFilter.status);
             if (historyFilter.search) params.append('search', historyFilter.search);
-            params.append('page', '1'); 
-            params.append('page_size', '1000');
+            params.append('page', '1');
+            params.append('page_size', '100');
+
             const res = await fetch('/api/tasks?' + params.toString());
             const data = await res.json();
-            if (res.ok) { 
-                historyTasks.value = (data.tasks || []).map(item => ({ 
-                    ...item, 
-                    showCrops: false, 
-                    cropsLoaded: false, 
-                    crops: [] 
-                })); 
+            if (res.ok) {
+                historyTasks.value = data.tasks || [];
             }
-        } catch (e) { 
-            window.ElementPlus.ElMessage.error('获取历史失败: ' + e.message); 
+        } catch (e) {
+            console.error('获取历史记录失败:', e);
         }
     };
 
-    const deleteTask = async (taskId) => { 
-        try { 
-            const res = await fetch('/api/tasks/' + taskId, { method: 'DELETE' }); 
-            if (res.ok) { 
-                fetchHistory(); 
-                window.ElementPlus.ElMessage.success('删除成功'); 
-            } else throw new Error('删除失败'); 
-        } catch (e) { 
-            window.ElementPlus.ElMessage.error('删除失败: ' + e.message); 
-        } 
+    const deleteTask = async (taskId) => {
+        try {
+            const res = await fetch('/api/tasks/' + taskId, { method: 'DELETE' });
+            if (res.ok) {
+                window.ElementPlus.ElMessage.success('已删除');
+                await fetchHistory();
+            }
+        } catch (e) {
+            window.ElementPlus.ElMessage.error('删除失败: ' + e.message);
+        }
     };
 
-    const cleanupCompleted = async () => { 
-        try { 
-            const res = await fetch('/api/tasks/cleanup', { method: 'POST' }); 
-            if (res.ok) { 
-                fetchHistory(); 
-                window.ElementPlus.ElMessage.success('清理完成'); 
-            } else throw new Error('清理失败'); 
-        } catch (e) { 
-            window.ElementPlus.ElMessage.error('清理失败: ' + e.message); 
-        } 
+    const cleanupCompleted = async () => {
+        try {
+            const res = await fetch('/api/tasks/cleanup-completed', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                window.ElementPlus.ElMessage.success('已清理 ' + data.deleted + ' 条记录');
+                await fetchHistory();
+            }
+        } catch (e) {
+            window.ElementPlus.ElMessage.error('清理失败: ' + e.message);
+        }
     };
 
-    const downloadHistoryFile = (taskId, type) => { 
-        window.open('/api/download/' + taskId + '/' + type, '_blank'); 
+    const downloadHistoryFile = (task, fileType) => {
+        const taskId = task.task_id;
+        const url = '/api/download/' + taskId + '/' + fileType;
+        window.open(url, '_blank');
     };
 
-    const toggleCrops = async (item) => {
-        item.showCrops = !item.showCrops;
-        if (item.showCrops && !item.cropsLoaded) {
-            try {
-                const res = await fetch('/api/tasks/' + item.task_id + '/crops');
-                const data = await res.json();
-                if (res.ok) { 
-                    item.crops = data.crops || []; 
-                    item.cropsLoaded = true; 
-                }
-            } catch (e) { 
-                window.ElementPlus.ElMessage.error('获取裁剪记录失败: ' + e.message); 
+    const toggleCrops = (taskId) => {
+        const task = historyTasks.value.find(t => t.task_id === taskId);
+        if (task) {
+            task.showCrops = !task.showCrops;
+            if (task.showCrops && !task.crops) {
+                fetchCrops(taskId);
             }
         }
     };
 
-    const downloadCropFile = (cropId) => { 
-        window.open('/api/download/crop/' + cropId, '_blank'); 
+    const fetchCrops = async (taskId) => {
+        try {
+            const res = await fetch('/api/crop/' + taskId);
+            const data = await res.json();
+            if (res.ok) {
+                const task = historyTasks.value.find(t => t.task_id === taskId);
+                if (task) task.crops = data.crops || [];
+            }
+        } catch (e) {
+            console.error('获取裁剪记录失败:', e);
+        }
     };
 
-    const reprocessTask = async (taskId) => { 
-        try { 
-            const res = await fetch('/api/tasks/' + taskId + '/reprocess', { method: 'POST' }); 
-            const data = await res.json(); 
-            if (!res.ok) throw new Error(data.detail || '重新制作失败'); 
-            
-            steps.forEach(s => { s.active = false; s.completed = false; }); 
-            task.value = { task_id: taskId, status: 'processing', step_progress: 0, current_step: '准备开始' }; 
-            
-            activeTab.value = 'main'; 
-            startPolling(taskId); 
-            window.ElementPlus.ElMessage.success('已开始重新制作'); 
-        } catch (e) { 
-            window.ElementPlus.ElMessage.error('重新制作失败: ' + e.message); 
-        } 
+    const downloadCropFile = (cropId) => {
+        window.open('/api/crop/' + cropId + '/download', '_blank');
+    };
+
+    const reprocessTask = async (taskId) => {
+        try {
+            const res = await fetch('/api/tasks/' + taskId + '/reprocess', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || '重新制作失败');
+
+            // 入队成功，刷新队列
+            window.ElementPlus.ElMessage.success('已加入队列，等待处理');
+
+            // 切换到处理中心
+            activeTab.value = 'main';
+
+            // 刷新任务队列
+            if (fetchTaskQueue) {
+                await fetchTaskQueue();
+            }
+        } catch (e) {
+            window.ElementPlus.ElMessage.error('重新制作失败: ' + e.message);
+        }
     };
 
     return {
@@ -115,6 +128,6 @@ export function useHistory(task, steps, startPolling, resetMain, activeTab) {
         downloadHistoryFile,
         toggleCrops,
         downloadCropFile,
-        reprocessTask
+        reprocessTask,
     };
 }

@@ -6,15 +6,16 @@ from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from pydantic import BaseModel
+from typing import List, Optional
 import pysubs2
 
 from backend.config import backend_config, PROJECT_ROOT
-from backend.database import create_task, get_task
-from backend.tasks import start_pipeline
+from backend.database import create_task, get_task, get_all_tasks, delete_task_by_id, delete_tasks_by_ids
+from backend.models import TaskStatus
 
 router = APIRouter()
 
-# 🆕 支持的视频格式白名单
+# 支持的视频格式白名单
 ALLOWED_EXTENSIONS = {".mp4", ".webm", ".mkv", ".avi", ".mov", ".flv", ".ts"}
 
 # 分片大小阈值：>= 5MB 使用分片上传
@@ -23,258 +24,237 @@ CHUNK_THRESHOLD = 5 * 1024 * 1024
 # =============================================================================
 # 辅助函数：文件式上传会话管理（不依赖数据库）
 # =============================================================================
+
 def _get_chunks_dir() -> Path:
     """获取分片存储根目录"""
     chunks_dir = backend_config.UPLOAD_DIR / ".chunks"
     chunks_dir.mkdir(parents=True, exist_ok=True)
     return chunks_dir
 
-def _get_session_dir(upload_id: str) -> Path:
-    """获取某个上传会话的目录"""
-    return _get_chunks_dir() / upload_id
+
+def _init_upload_session(upload_id: str, filename: str, file_size: int, total_chunks: int, has_subtitle: bool = False):
+    """初始化上传会话元数据"""
+    meta = {
+        "upload_id": upload_id,
+        "filename": filename,
+        "file_size": file_size,
+        "total_chunks": total_chunks,
+        "uploaded_chunks": [],
+        "status": "uploading",
+        "has_subtitle": has_subtitle,
+        "task_id": None,
+    }
+    meta_path = _get_chunks_dir() / upload_id / "meta.json"
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False)
+    return meta
+
 
 def _read_meta(upload_id: str) -> dict | None:
     """读取上传会话元数据"""
-    meta_path = _get_session_dir(upload_id) / "meta.json"
+    meta_path = _get_chunks_dir() / upload_id / "meta.json"
     if not meta_path.exists():
         return None
-    with open(meta_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
 
-def _write_meta(upload_id: str, meta: dict):
+
+def _write_meta(meta: dict):
     """写入上传会话元数据"""
-    meta_path = _get_session_dir(upload_id) / "meta.json"
+    meta_path = _get_chunks_dir() / meta["upload_id"] / "meta.json"
     with open(meta_path, "w", encoding="utf-8") as f:
-        json.dump(meta, f, ensure_ascii=False, indent=2)
+        json.dump(meta, f, ensure_ascii=False)
 
-def _get_uploaded_chunk_indices(upload_id: str) -> list[int]:
-    """扫描磁盘获取已上传的分片索引列表"""
-    session_dir = _get_session_dir(upload_id)
+
+def _get_uploaded_chunk_indices(upload_id: str) -> list:
+    """获取已上传的分片索引列表"""
+    session_dir = _get_chunks_dir() / upload_id
     if not session_dir.exists():
         return []
     indices = []
     for f in session_dir.iterdir():
-        if f.is_file() and f.name.startswith("chunk_"):
+        if f.name.startswith("chunk_") and f.is_file():
             try:
-                idx = int(f.name.replace("chunk_", ""))
+                idx = int(f.name.split("_")[1].split(".")[0])
                 indices.append(idx)
-            except ValueError:
+            except (ValueError, IndexError):
                 pass
     return sorted(indices)
 
-# =============================================================================
-# 🆕 字幕文件校验与落盘逻辑
-# =============================================================================
-def _generate_safe_base_name(filename: str) -> str:
-    """与 runner.py 中逻辑保持一致，生成安全的文件主干名"""
-    stem = Path(filename).stem
-    safe_stem = re.sub(r'[\\/:*?"<>|]', '_', stem)
-    max_len = 50
-    if len(safe_stem) > max_len:
-        safe_stem = safe_stem[:max_len]
-    return safe_stem
 
-def _save_and_validate_subtitle(task_id: str, original_filename: str, subtitle_file: UploadFile) -> bool:
-    """
-    保存并校验字幕文件。
-    校验通过则重命名为 {safe_base_name}.srt 放入 output/{task_id}/ 目录。
-    校验失败则删除并返回 False，让系统降级回 Whisper。
-    """
-    safe_base_name = _generate_safe_base_name(original_filename)
-    output_dir = PROJECT_ROOT / "output" / task_id
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    final_srt_path = output_dir / f"{safe_base_name}.srt"
-    temp_path = output_dir / f"temp_{uuid.uuid4().hex}.srt"
-    
-    # 先写到临时文件
-    with open(temp_path, "wb") as f:
-        shutil.copyfileobj(subtitle_file.file, f)
-        
-    try:
-        # 使用 pysubs2 校验字幕格式
-        pysubs2.load(str(temp_path), encoding="utf-8")
-        # 校验通过，重命名为最终目标文件
-        shutil.move(str(temp_path), str(final_srt_path))
-        print(f"[upload] ✅ 字幕校验通过，已落盘: {final_srt_path}")
-        return True
-    except Exception as e:
-        print(f"[upload] ⚠️ 字幕校验失败，已丢弃，将降级为 Whisper: {e}")
-        if temp_path.exists():
-            temp_path.unlink()
+def _merge_chunks(upload_id: str, output_path: Path) -> bool:
+    """合并分片文件"""
+    session_dir = _get_chunks_dir() / upload_id
+    indices = _get_uploaded_chunk_indices(upload_id)
+    if not indices:
         return False
 
+    with open(output_path, "wb") as out_f:
+        for idx in indices:
+            chunk_path = session_dir / f"chunk_{idx}.part"
+            with open(chunk_path, "rb") as chunk_f:
+                out_f.write(chunk_f.read())
+
+    return True
+
+
+def _cleanup_session(upload_id: str):
+    """清理上传会话临时文件"""
+    session_dir = _get_chunks_dir() / upload_id
+    if session_dir.exists():
+        shutil.rmtree(session_dir, ignore_errors=True)
+
+
 # =============================================================================
-# 原始简单上传（保留兼容，增加可选 subtitle 参数）
+# 简单上传（< 5MB）：文件直接保存，只创建 uploaded 状态的任务，不启动流水线
 # =============================================================================
+
 @router.post("/upload")
 async def upload_video(file: UploadFile = File(...), subtitle: UploadFile = File(None)):
-    filename = file.filename or "unknown_video"
+    """简单上传：保存文件，创建任务（状态 uploaded），不启动处理"""
+    # 验证扩展名
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(400, f"不支持的文件格式: {ext}")
+
+    # 生成任务 ID 和保存路径
+    task_id = uuid.uuid4().hex[:12]
+    saved_name = f"{task_id}_{file.filename}"
+    save_path = backend_config.UPLOAD_DIR / saved_name
+
+    # 保存视频文件
+    with open(save_path, "wb") as f:
+        content = await file.read()
+        f.write(content)
+
+    file_size = len(content)
+
+    # 如果有字幕文件，保存到 uploads 目录
+    if subtitle and subtitle.filename:
+        sub_ext = Path(subtitle.filename).suffix.lower()
+        sub_name = f"{task_id}_subtitle{sub_ext}"
+        sub_path = backend_config.UPLOAD_DIR / sub_name
+        with open(sub_path, "wb") as f:
+            sub_content = await subtitle.read()
+            f.write(sub_content)
+
+    # 创建任务记录（状态 = uploaded）
+    await create_task(
+        task_id=task_id,
+        input_path=str(save_path),
+        original_filename=file.filename,
+        file_size=file_size,
+    )
+
+    return {"task_id": task_id, "status": "uploaded"}
+
+
+# =============================================================================
+# 分片上传（>= 5MB）：支持断点续传
+# =============================================================================
+
+@router.post("/upload/chunk/init")
+async def init_chunk_upload(
+    filename: str = Query(...),
+    file_size: int = Query(...),
+    total_chunks: int = Query(...),
+    has_subtitle: bool = Query(False),
+):
+    """初始化分片上传会话"""
     ext = Path(filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(400, f"不支持的文件格式: {ext}")
 
-    if not ext or ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(400, f"不支持的视频格式: {ext}，支持: {', '.join(ALLOWED_EXTENSIONS)}")
-
-    task_id = str(uuid.uuid4())
-    upload_dir = backend_config.UPLOAD_DIR
-    upload_dir.mkdir(parents=True, exist_ok=True)
-
-    video_path = upload_dir / f"{task_id}{ext}"
-
-    with open(video_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    file_size = video_path.stat().st_size
-    await create_task(task_id, str(video_path), original_filename=file.filename, file_size=file_size)
-
-    # 🆕 如果携带了字幕，先落盘校验
-    if subtitle:
-        _save_and_validate_subtitle(task_id, file.filename, subtitle)
-
-    # 启动后台流水线
-    import asyncio
-    asyncio.create_task(start_pipeline(task_id, video_path))
-    
-    return {"task_id": task_id}
-
-# =============================================================================
-# 🆕 分片上传：初始化
-# =============================================================================
-class UploadInitRequest(BaseModel):
-    filename: str
-    file_size: int
-    total_chunks: int
-
-@router.post("/upload/init")
-async def init_upload(req: UploadInitRequest):
-    """初始化分片上传会话，返回 upload_id"""
-    ext = Path(req.filename).suffix.lower()
-    if not ext or ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(400, f"不支持的视频格式: {ext}，支持: {', '.join(ALLOWED_EXTENSIONS)}")
-
-    upload_id = str(uuid.uuid4())
-    session_dir = _get_session_dir(upload_id)
-    session_dir.mkdir(parents=True, exist_ok=True)
-
-    meta = {
-        "upload_id": upload_id,
-        "filename": req.filename,
-        "file_size": req.file_size,
-        "total_chunks": req.total_chunks,
-        "ext": ext,
-        "status": "uploading",
-        "task_id": None,
-        "created_at": __import__("datetime").datetime.utcnow().isoformat(),
-    }
-    _write_meta(upload_id, meta)
+    upload_id = uuid.uuid4().hex[:16]
+    _init_upload_session(upload_id, filename, file_size, total_chunks, has_subtitle)
 
     return {
         "upload_id": upload_id,
-        "total_chunks": req.total_chunks,
-        "chunk_size": CHUNK_THRESHOLD,
+        "uploaded_chunks": [],
     }
 
-# =============================================================================
-# 🆕 分片上传：上传单个分片
-# =============================================================================
-@router.post("/upload/chunk")
-async def upload_chunk(
-    upload_id: str = Query(...),
-    chunk_index: int = Query(...),
-    chunk: UploadFile = File(...)
-):
+
+@router.post("/upload/chunk/{upload_id}/complete")
+async def complete_chunk_upload(upload_id: str, subtitle: UploadFile = File(None)):
+    """分片上传完成：合并文件，创建任务（状态 uploaded），不启动处理"""
+    meta = _read_meta(upload_id)
+    if not meta:
+        raise HTTPException(404, "上传会话不存在")
+
+    # 检查所有分片是否已上传
+    uploaded = _get_uploaded_chunk_indices(upload_id)
+    if len(uploaded) != meta["total_chunks"]:
+        raise HTTPException(400, f"分片不完整: 已上传 {len(uploaded)}/{meta['total_chunks']}")
+
+    # 合并文件
+    task_id = uuid.uuid4().hex[:12]
+    ext = Path(meta["filename"]).suffix.lower()
+    saved_name = f"{task_id}_{meta['filename']}"
+    output_path = backend_config.UPLOAD_DIR / saved_name
+
+    if not _merge_chunks(upload_id, output_path):
+        raise HTTPException(500, "文件合并失败")
+
+    # 保存字幕文件
+    if subtitle and subtitle.filename:
+        sub_ext = Path(subtitle.filename).suffix.lower()
+        sub_name = f"{task_id}_subtitle{sub_ext}"
+        sub_path = backend_config.UPLOAD_DIR / sub_name
+        with open(sub_path, "wb") as f:
+            sub_content = await subtitle.read()
+            f.write(sub_content)
+
+    # 创建任务记录（状态 = uploaded）
+    await create_task(
+        task_id=task_id,
+        input_path=str(output_path),
+        original_filename=meta["filename"],
+        file_size=meta["file_size"],
+    )
+
+    # 清理分片临时文件（任务已记录，会话结束，元数据无需保留）
+    _cleanup_session(upload_id)
+
+    return {"task_id": task_id, "status": "uploaded"}
+
+
+@router.post("/upload/chunk/{upload_id}/{chunk_index}")
+async def upload_chunk(upload_id: str, chunk_index: int, chunk: UploadFile = File(...)):
     """上传单个分片"""
     meta = _read_meta(upload_id)
     if not meta:
         raise HTTPException(404, "上传会话不存在")
     if meta["status"] != "uploading":
-        raise HTTPException(400, "上传会话已关闭")
+        raise HTTPException(400, "上传会话已结束")
     if chunk_index < 0 or chunk_index >= meta["total_chunks"]:
-        raise HTTPException(400, f"分片索引越界: {chunk_index} (总数: {meta['total_chunks']})")
+        raise HTTPException(400, "分片索引超出范围")
 
-    session_dir = _get_session_dir(upload_id)
-    chunk_path = session_dir / f"chunk_{chunk_index}"
+    # 保存分片
+    chunk_path = _get_chunks_dir() / upload_id / f"chunk_{chunk_index}.part"
     with open(chunk_path, "wb") as f:
-        shutil.copyfileobj(chunk.file, f)
+        content = await chunk.read()
+        f.write(content)
 
-    uploaded_indices = _get_uploaded_chunk_indices(upload_id)
+    # 更新元数据
+    if chunk_index not in meta["uploaded_chunks"]:
+        meta["uploaded_chunks"].append(chunk_index)
+    _write_meta(meta)
+
     return {
         "upload_id": upload_id,
         "chunk_index": chunk_index,
-        "uploaded_chunks": uploaded_indices,
-        "total_chunks": meta["total_chunks"],
+        "uploaded_chunks": meta["uploaded_chunks"],
     }
 
-# =============================================================================
-# 🆕 分片上传：完成上传 (增加 has_subtitle 判断)
-# =============================================================================
-@router.post("/upload/complete")
-async def complete_upload(upload_id: str = Query(...), has_subtitle: bool = Query(False)):
-    """合并分片，创建任务，启动流水线"""
-    meta = _read_meta(upload_id)
-    if not meta:
-        raise HTTPException(404, "上传会话不存在")
-    if meta["status"] != "uploading":
-        raise HTTPException(400, f"上传会话状态为 {meta['status']}，无法完成")
-
-    uploaded_indices = _get_uploaded_chunk_indices(upload_id)
-    total = meta["total_chunks"]
-    expected = set(range(total))
-    actual = set(uploaded_indices)
-    missing = expected - actual
-    if missing:
-        raise HTTPException(400, f"尚有分片未上传: {sorted(missing)} ({len(actual)}/{total})")
-
-    session_dir = _get_session_dir(upload_id)
-    task_id = upload_id
-    ext = meta["ext"]
-    video_path = backend_config.UPLOAD_DIR / f"{task_id}{ext}"
-
-    with open(video_path, "wb") as out_f:
-        for i in range(total):
-            chunk_path = session_dir / f"chunk_{i}"
-            if not chunk_path.exists():
-                raise HTTPException(400, f"分片 {i} 文件不存在")
-            with open(chunk_path, "rb") as in_f:
-                shutil.copyfileobj(in_f, out_f)
-
-    shutil.rmtree(session_dir, ignore_errors=True)
-    meta["status"] = "completed"
-    meta["task_id"] = task_id
-
-    file_size = video_path.stat().st_size
-    await create_task(task_id, str(video_path), original_filename=meta["filename"], file_size=file_size)
-
-    # 🆕 只有当不需要等待字幕上传时，才直接启动流水线
-    if not has_subtitle:
-        import asyncio
-        asyncio.create_task(start_pipeline(task_id, video_path))
-
-    return {"task_id": task_id, "status": "ready_for_subtitle" if has_subtitle else "processing"}
 
 # =============================================================================
-# 🆕 新增接口：单独上传字幕文件并触发流水线
+# 分片上传：查询状态（用于断点续传）
 # =============================================================================
-@router.post("/upload/subtitle")
-async def upload_subtitle(task_id: str = Query(...), subtitle: UploadFile = File(...)):
-    """分片上传场景下，视频合并完成后上传字幕，并在此处触发流水线"""
-    task = await get_task(task_id)
-    if not task:
-        raise HTTPException(404, "任务不存在")
 
-    # 保存并校验字幕
-    _save_and_validate_subtitle(task_id, task.original_filename, subtitle)
-
-    # 启动后台流水线
-    import asyncio
-    from pathlib import Path
-    asyncio.create_task(start_pipeline(task_id, Path(task.input_video_path)))
-    
-    return {"task_id": task_id, "status": "processing"}
-
-# =============================================================================
-# 🆕 分片上传：查询状态（用于断点续传）
-# =============================================================================
 @router.get("/upload/status/{upload_id}")
 async def upload_status(upload_id: str):
     """查询上传会话状态，返回已上传的分片列表"""
@@ -292,3 +272,52 @@ async def upload_status(upload_id: str):
         "status": meta["status"],
         "task_id": meta.get("task_id"),
     }
+
+
+# =============================================================================
+# 暂存区管理：删除未入队的文件
+# =============================================================================
+
+@router.delete("/upload/pending/{task_id}")
+async def delete_pending_task(task_id: str):
+    """删除暂存区中的单个未入队文件"""
+    task = await get_task(task_id)
+    if not task:
+        raise HTTPException(404, "任务不存在")
+    if task.status != "uploaded":
+        raise HTTPException(400, f"任务状态为 {task.status}，只能删除 uploaded 状态的文件")
+
+    # 删除硬盘文件
+    input_path = Path(task.input_video_path) if task.input_video_path else None
+    if input_path and input_path.exists():
+        input_path.unlink(missing_ok=True)
+
+    # 删除关联的字幕文件
+    for f in backend_config.UPLOAD_DIR.iterdir():
+        if f.name.startswith(f"{task_id}_subtitle"):
+            f.unlink(missing_ok=True)
+
+    # 删除数据库记录
+    await delete_task_by_id(task_id)
+
+    return {"deleted": task_id}
+
+
+@router.delete("/upload/pending")
+async def clear_all_pending():
+    """清空暂存区：删除所有 uploaded 状态的文件"""
+    tasks, total = await get_all_tasks(status="uploaded", page=1, page_size=10000)
+    ids = []
+    for t in tasks:
+        input_path = Path(t.input_video_path) if t.input_video_path else None
+        if input_path and input_path.exists():
+            input_path.unlink(missing_ok=True)
+        for f in backend_config.UPLOAD_DIR.iterdir():
+            if f.name.startswith(f"{t.task_id}_subtitle"):
+                f.unlink(missing_ok=True)
+        ids.append(t.task_id)
+
+    if ids:
+        await delete_tasks_by_ids(ids)
+
+    return {"deleted": len(ids)}

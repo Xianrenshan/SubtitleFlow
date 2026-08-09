@@ -2,6 +2,7 @@ import json
 import re
 from pathlib import Path
 from typing import Any, Tuple
+from typing import List, Dict, Any
 
 def format_timestamp(seconds: float) -> str:
     whole_seconds = int(seconds)

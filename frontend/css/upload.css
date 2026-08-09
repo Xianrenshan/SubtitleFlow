@@ -1,14 +1,28 @@
-/* Upload styles */
-.upload-zone { border: 1px dashed var(--border); border-radius: var(--radius-lg); padding: 48px; text-align: center; transition: all 0.15s ease; cursor: pointer; background: var(--bg-secondary); }
-.upload-zone:hover { border-color: var(--text-primary); background: var(--bg-tertiary); }
-.upload-zone .el-upload-dragger { background: transparent; border: none; width: 100%; }
-.upload-file-info { margin-top: 16px; color: var(--text-secondary); font-size: 14px; }
-.advanced-options-panel { margin-top: 12px; text-align: left; }
-.subtitle-upload-box { margin-top: 12px; padding: 16px; border: 1px dashed var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); }
-.subtitle-upload-box .el-upload-dragger { background: transparent; border: none; width: 100%; padding: 16px; }
-.subtitle-success-hint { margin-top: 8px; font-size: 13px; color: var(--success); }
+/* ============================================================
+ * upload.css - 上传与队列页面样式（上传与计算分离版）
+ * ============================================================ */
 
-/* Progress bar styles */
+/* ==================== 上传区域 ==================== */
+.upload-zone {
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-lg);
+    padding: 48px;
+    text-align: center;
+    transition: all 0.15s ease;
+    cursor: pointer;
+    background: var(--bg-secondary);
+}
+.upload-zone:hover {
+    border-color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+.upload-zone .el-upload-dragger {
+    background: transparent;
+    border: none;
+    width: 100%;
+}
+
+/* ==================== 上传进度条 ==================== */
 .upload-progress-bar { margin-top: 16px; }
 .upload-progress-bar .el-progress__text { color: var(--text-secondary) !important; font-size: 12px !important; }
 .el-progress-bar__outer { background-color: var(--border); border-radius: var(--radius-sm); }
@@ -16,3 +30,232 @@
 .el-progress__text { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
 .el-progress-circle__track { stroke: var(--border); }
 .el-progress-circle__path { stroke: var(--accent) !important; }
+
+/* ==================== 高级选项 ==================== */
+.advanced-options-panel { margin-top: 12px; text-align: left; }
+.subtitle-upload-box {
+    margin-top: 12px;
+    padding: 16px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+}
+.subtitle-upload-box .el-upload-dragger { background: transparent; border: none; width: 100%; padding: 16px; }
+.subtitle-success-hint { margin-top: 8px; font-size: 13px; color: var(--success); }
+
+/* ==================== 上传 Tab 容器 ==================== */
+.upload-tab-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* ==================== 通用 Section Header ==================== */
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.section-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.section-count {
+    font-size: 13px;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    padding: 2px 10px;
+    border-radius: var(--radius-sm);
+}
+
+/* ==================== 待处理文件库 ==================== */
+.pending-library-section {
+    margin-bottom: 0;
+}
+
+.pending-file-list {
+    margin-top: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.pending-file-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.pending-file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s ease;
+}
+.pending-file-item:last-child {
+    border-bottom: none;
+}
+.pending-file-item:hover {
+    background: var(--bg-secondary);
+}
+.pending-file-item.selected {
+    background: var(--bg-tertiary);
+}
+
+.pending-file-item .file-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+.pending-file-item .file-name {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pending-file-item .file-size {
+    font-size: 13px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+.pending-file-item .file-date {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+}
+
+.pending-empty-hint {
+    text-align: center;
+    padding: 32px;
+    color: var(--text-tertiary);
+    font-size: 14px;
+}
+
+.resume-hint {
+    margin-top: 16px;
+    padding: 12px 16px;
+    border: 1px dashed var(--warning);
+    border-radius: var(--radius-md);
+    background: rgba(245, 166, 35, 0.04);
+}
+.resume-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+/* ==================== 实时任务队列 ==================== */
+.task-queue-section {
+    margin-top: 0;
+}
+
+.queue-task-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: var(--surface);
+}
+.queue-task-card:last-child {
+    margin-bottom: 0;
+}
+.queue-task-card:hover {
+    border-color: var(--text-secondary);
+    background: var(--surface-hover);
+}
+.queue-task-card.focused {
+    border-color: var(--accent);
+    border-width: 2px;
+}
+
+.task-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+.task-card-header .task-filename {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    margin-right: 12px;
+}
+
+.task-card-body {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.task-card-body .task-step {
+    font-size: 13px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+.task-card-body .task-progress-text {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+    min-width: 36px;
+    text-align: right;
+}
+
+.task-card-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* ==================== 聚焦任务详情 ==================== */
+.focus-task-detail {
+    margin-top: 0;
+}
+
+/* ==================== 响应式 ==================== */
+@media (max-width: 768px) {
+    .upload-zone {
+        padding: 24px;
+    }
+
+    .pending-file-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    .pending-file-toolbar .el-button {
+        width: 100%;
+    }
+
+    .pending-file-item {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    .pending-file-item .file-date {
+        width: 100%;
+    }
+
+    .task-card-actions {
+        flex-wrap: wrap;
+    }
+
+    .task-card-header .task-filename {
+        font-size: 13px;
+    }
+}

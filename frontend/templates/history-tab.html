@@ -2,87 +2,62 @@
   <div class="history-toolbar">
     <el-radio-group v-model="historyFilter.status" @change="fetchHistory" class="history-status-tabs" size="small">
       <el-radio-button label="">全部</el-radio-button>
-      <el-radio-button label="pending">准备中</el-radio-button>
+      <el-radio-button label="uploaded">已上传</el-radio-button>
+      <el-radio-button label="waiting">等待中</el-radio-button>
       <el-radio-button label="processing">处理中</el-radio-button>
       <el-radio-button label="success">成功</el-radio-button>
       <el-radio-button label="failed">失败</el-radio-button>
+      <el-radio-button label="paused">已暂停</el-radio-button>
+      <el-radio-button label="interrupted">已中断</el-radio-button>
     </el-radio-group>
     <el-input v-model="historyFilter.search" placeholder="搜索文件名..." clearable @input="onSearchInput" @clear="fetchHistory" class="history-search-input" />
     <el-button @click="fetchHistory" type="primary" plain>刷新</el-button>
-    <el-popconfirm title="确定清除所有已完成和失败的任务？" @confirm="cleanupCompleted">
+    <el-popconfirm title="确定清除所有已完成、失败和中断的任务？" @confirm="cleanupCompleted">
       <template #reference>
-        <el-button type="danger" plain>一键清理</el-button>
+        <el-button type="danger" plain>清理</el-button>
       </template>
     </el-popconfirm>
   </div>
-  <div class="history-grid">
-    <div v-for="item in filteredHistoryTasks" :key="item.task_id" class="history-card">
-      <div class="card-header">
-        <div class="card-filename" :title="item.original_filename"> {{ item.original_filename || item.task_id }} </div>
-        <div class="card-status">
-          <el-tag :type="item.status === 'success' ? 'success' : item.status === 'failed' ? 'danger' : 'warning'" size="small" effect="dark">
-            {{ item.status === 'success' ? '成功' : item.status === 'failed' ? '失败' : item.status === 'pending' ? '准备中' : '处理中' }}
-          </el-tag>
-        </div>
+ 
+  <div class="history-list">
+    <div v-for="t in filteredHistoryTasks" :key="t.task_id" class="history-item">
+      <div class="history-item-header">
+        <span class="history-filename">🎬 {{ t.original_filename || t.task_id }}</span>
+        <el-tag :type="statusTagType(t.status)" size="small">{{ statusLabel(t.status) }}</el-tag>
       </div>
-      <div class="card-meta">
-        <span>{{ formatDate(item.created_at) }}</span>
-        <span v-if="item.file_size">{{ formatFileSize(item.file_size) }}</span>
+ 
+      <div class="history-item-meta">
+        <span v-if="t.file_size" class="meta-item">{{ formatFileSize(t.file_size) }}</span>
+        <span class="meta-item">{{ formatDate(t.created_at) }}</span>
+        <span v-if="t.current_step" class="meta-item">{{ t.current_step }}</span>
       </div>
-
-      <!-- 核心重点：Token 消耗与模型明细摘要栏 -->
-      <div v-if="item.token_usage && item.token_usage.total_tokens > 0" class="token-summary-bar">
-        <div class="token-badge-group">
-          <span class="token-tag">⚡ {{ item.token_usage.total_tokens.toLocaleString() }} Tokens</span>
-          <span class="token-tag-sub">调用 {{ item.token_usage.total_calls }} 次 API</span>
-        </div>
-        <el-button size="small" type="info" text @click="item.showTokenDetails = !item.showTokenDetails" style="padding: 0; font-size: 12px;">
-          {{ item.showTokenDetails ? '收起 Token 明细 ▲' : '查看 Token 明细 ▼' }}
-        </el-button>
+ 
+      <div v-if="t.error_message" class="history-error">{{ t.error_message }}</div>
+ 
+      <div class="history-item-actions">
+        <!-- 下载按钮（成功任务） -->
+        <el-button v-if="t.status === 'success'" size="small" @click="downloadHistoryFile(t, 'video')" type="primary" plain>下载视频</el-button>
+        <el-button v-if="t.status === 'success'" size="small" @click="downloadHistoryFile(t, 'zh_srt')" type="info" plain>中文字幕</el-button>
+        <el-button v-if="t.status === 'success'" size="small" @click="downloadHistoryFile(t, 'en_srt')" type="info" plain>英文字幕</el-button>
+ 
+        <!-- 重新入队按钮（成功/失败/中断任务） -->
+        <el-button v-if="t.status === 'success' || t.status === 'failed' || t.status === 'interrupted'" size="small" @click="reprocessTask(t.task_id)" type="warning" plain>重新入队</el-button>
+ 
+        <!-- 裁剪按钮（成功任务） -->
+        <el-button v-if="t.status === 'success'" size="small" @click="toggleCrops(t.task_id)" type="info" text>{{ t.showCrops ? '收起裁剪' : '裁剪' }}</el-button>
+ 
+        <!-- 删除按钮 -->
+        <el-popconfirm title="确定删除此任务？" @confirm="deleteTask(t.task_id)">
+          <template #reference>
+            <el-button size="small" type="danger" text>删除</el-button>
+          </template>
+        </el-popconfirm>
       </div>
-
-      <!-- Token 详细拆解面板 -->
-      <div v-if="item.showTokenDetails && item.token_usage" class="token-details-panel">
-        <div class="token-details-title">各个阶段模型与 Token 消耗明细</div>
-        <div class="token-table">
-          <div class="token-table-header">
-            <span>处理阶段</span>
-            <span>模型名称</span>
-            <span>调用次数</span>
-            <span>消耗 Token (输入/输出)</span>
-          </div>
-          <div v-for="(p, key) in item.token_usage.phases" :key="key" class="token-table-row">
-            <span class="phase-name">{{ p.phase_name }}</span>
-            <span class="model-name" :title="p.model">{{ p.model || '-' }}</span>
-            <span class="calls-count">{{ p.calls }} 次</span>
-            <span class="tokens-count">
-              <strong>{{ p.total_tokens.toLocaleString() }}</strong>
-              <small>({{ p.prompt_tokens.toLocaleString() }} / {{ p.completion_tokens.toLocaleString() }})</small>
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div class="card-actions">
-        <template v-if="item.status === 'success'">
-          <el-button size="small" @click="downloadHistoryFile(item.task_id, 'video')" v-if="item.output_video_path">🎬 原版</el-button>
-          <el-button size="small" @click="downloadHistoryFile(item.task_id, 'zh_srt')" v-if="item.output_zh_srt">🇨🇳 中字</el-button>
-          <el-button size="small" @click="downloadHistoryFile(item.task_id, 'en_srt')" v-if="item.output_en_srt">🇬🇧 英字</el-button>
-          <el-button size="small" @click="downloadHistoryFile(item.task_id, 'meta')" v-if="item.output_meta">📄 元数据</el-button>
-          <el-button size="small" type="primary" plain @click="openCropDialog(item.task_id)">✂️ 裁剪</el-button>
-        </template>
-        <el-button size="small" type="warning" plain @click="reprocessTask(item.task_id)" v-if="item.status === 'success' || item.status === 'failed'">
-          重新制作
-        </el-button>
-        <el-button size="small" type="danger" @click="deleteTask(item.task_id)">删除</el-button>
-        <el-button size="small" type="info" text @click="toggleCrops(item)" v-if="item.status === 'success'" style="margin-left: auto;">
-          {{ item.showCrops ? '收起裁剪版 ▲' : '查看裁剪版 ▼' }}
-        </el-button>
-      </div>
-      <div v-if="item.showCrops" class="crop-list">
-        <div v-if="!item.cropsLoaded" style="font-size:12px; color:var(--text-secondary);">加载中...</div>
-        <div v-else-if="item.crops.length === 0" style="font-size:12px; color:var(--text-secondary);">暂无裁剪记录</div>
-        <div v-else v-for="crop in item.crops" :key="crop.crop_id" class="crop-item">
+ 
+      <!-- 裁剪记录展开区 -->
+      <div v-if="t.showCrops" class="crop-list">
+        <div v-if="!t.crops || t.crops.length === 0" style="font-size: 13px; color: var(--text-secondary); padding: 8px 0;">暂无裁剪记录</div>
+        <div v-for="crop in (t.crops || [])" :key="crop.crop_id" class="crop-item">
           <div class="crop-info">
             <span>裁剪片段数: {{ crop.segments ? crop.segments.length : 0 }}</span>
             <el-tag :type="crop.status === 'success' ? 'success' : crop.status === 'failed' ? 'danger' : 'warning'" size="small">
@@ -96,6 +71,9 @@
         </div>
       </div>
     </div>
-    <div v-if="filteredHistoryTasks.length === 0" style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);"> 暂无历史任务 </div>
+ 
+    <div v-if="filteredHistoryTasks.length === 0" style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">
+      暂无历史任务
+    </div>
   </div>
 </div>
